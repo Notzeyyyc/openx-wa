@@ -1,41 +1,162 @@
-## Setup (Security First)
+# OpenXX
 
-This repo intentionally does **not** commit any secrets.
+WhatsApp AI bot that actually does stuff — talks to your phone via ADB, runs AI models, plays music, and more. Built to run on a VPS or straight on your Android via Termux.
 
-1. Copy environment template:
-   - See [.env.example](.env.example:1)
-2. Create a local `.env` file (ignored by git via [.gitignore](.gitignore:1))
-3. Fill:
-   - `OPENX_DEV_PHONE_NUMBER`
-   - `OPENX_OPENROUTER_API_KEYS` (comma-separated)
+## Features
 
-### Secret scanning
+- **WhatsApp Bot** — AI-powered chat with multiple personalities
+- **ADB Control** — Take screenshots, tap, swipe, open apps on your phone
+- **Music Player** — `.play <song name>` and get the audio
+- **AI Providers** — OpenRouter, OpenAI-compatible (SumoPod), Claude, custom REST
+- **MCP Server** — 11 plugins (shell, file, device, browser, memory, cron, etc.)
+- **Conversation Memory** — AI remembers your previous messages
+- **RAM Monitor** — Check memory usage from WhatsApp
+- **Plugin System** — Extend with custom plugins (sandboxed)
 
-Running tests will run a small secret scanner:
+## Quick Start
 
-- Script: [scripts/scan-secrets.mjs](scripts/scan-secrets.mjs:1)
-- Package script: `pnpm test` (mapped to `pnpm run scan:secrets` in [package.json](package.json:1))
+### On Termux (Android)
 
-## Plugins (Security Model)
+One-liner install:
 
-Plugin config lives in:
+```bash
+pkg install curl -y && curl -sL https://raw.githubusercontent.com/Notzeyyyc/openx-wa/main/scripts/termux-setup.sh | sh
+```
 
-- [package/plugins.json](package/plugins.json:1)
-- Integrity pins: [package/plugins.lock.json](package/plugins.lock.json:1)
+This installs everything, builds the MCP server, and starts the bot in the background.
 
-### Integrity (sha256 pinning)
+After install, use the `openxx` command:
 
-Each plugin has an `id` and an `entry` (path or npm specifier). At runtime OpenX computes sha256 of the resolved entry file and requires a matching pin in `plugins.lock.json` unless `OPENX_ALLOW_UNPINNED_PLUGINS=true`.
+```bash
+openxx           # Start bot + MCP
+openxx stop      # Stop everything
+openxx restart   # Restart everything
+openxx status    # Check if it's running
+openxx logs      # View bot logs
+openxx logs-mcp  # View MCP server logs
+```
 
-### Permissions (capabilities)
+### On VPS / PC
 
-Plugins get a `host` API and are blocked unless they requested a permission:
+```bash
+# Clone the repo
+git clone https://github.com/Notzeyyyc/openx-wa.git
+cd openx-wa
 
-- `wa.send` for WhatsApp send
-- `ai.chat` for OpenRouter calls
+# Install dependencies
+pnpm install
 
-Enforcement happens inside the plugin host API in [package/openx/plugin_manager.mjs](package/openx/plugin_manager.mjs:1).
+# Setup config
+cp .env.example .env
+nano .env  # fill in your values
 
-### Optional sandbox
+# Start
+pnpm start
+```
 
-Per plugin you can set `sandbox: true` in [package/plugins.json](package/plugins.json:1). This runs the plugin in a separate process (IPC), and privileged calls go through the permission-checked host API.
+## Configuration
+
+Copy `.env.example` to `.env` and fill in:
+
+```env
+# WhatsApp admin number (no + sign)
+OPENX_DEV_PHONE_NUMBER=628123456789
+
+# AI Provider: openrouter | openai | claude | rest
+OPENX_AI_PROVIDER=openai
+
+# OpenAI-compatible (SumoPod, Together, Groq, etc.)
+OPENX_OPENAI_BASE_URL=https://ai.sumopod.com
+OPENX_OPENAI_API_KEY=your-key
+OPENX_OPENAI_MODEL=gpt-4o-mini
+
+# Claude API (FongsiDev)
+OPENX_CLAUDE_BASE_URL=https://fgsi.dpdns.org/api/ai/claude
+OPENX_CLAUDE_API_KEY=your-key
+
+# ADB mode: auto | usb | or port number
+OPENX_ADB_PORT=usb
+
+# MCP Server URL
+OPENX_MCP_URL=http://localhost:8765
+OPENX_MCP_API_KEY=your-token
+```
+
+## WhatsApp Commands
+
+| Command | Description |
+|---------|-------------|
+| `.play <song>` | Play a song |
+| `.personality list` | List available personalities |
+| `.personality select <key>` | Switch personality |
+| `.model list` | List AI models |
+| `.model select <name>` | Switch model |
+| `ram` | Show RAM usage |
+| `gc` | Force garbage collect |
+| `reset` | Clear conversation memory |
+| `ping` | Pong! |
+
+Just send any message without a prefix and the AI will reply naturally.
+
+## USB ADB Setup
+
+1. Connect phone to laptop via USB
+2. Enable USB Debugging (Settings > Developer Options)
+3. Accept the RSA key prompt on your phone
+4. Set `OPENX_ADB_PORT=usb` in `.env`
+5. Run `adb devices` to verify
+
+## MCP Server
+
+The MCP server runs separately and provides tools like shell execution, file ops, device control, browser, memory, and more.
+
+```bash
+# Build
+cd openx-mcp
+go build -o openx-mcp .
+
+# Run
+./openx-mcp
+```
+
+Config: `openx-mcp/config.yaml`
+
+## Project Structure
+
+```
+openxx/
+├── index.js              # Entry point
+├── src/
+│   ├── config.js         # Configuration + env loader
+│   ├── logger.js         # Logging
+│   ├── ai-provider.js    # AI provider router
+│   ├── adb-connect.js    # ADB port detection
+│   ├── adb-helper.js     # ADB commands
+│   ├── downloader.js     # Media downloader
+│   ├── plugin-manager.mjs
+│   ├── providers/
+│   │   ├── openai.js     # OpenAI-compatible
+│   │   ├── openrouter.js # OpenRouter
+│   │   ├── claude.js     # Claude API
+│   │   └── rest.js       # Custom REST
+│   └── whatsapp/
+│       ├── connection.js      # WhatsApp socket
+│       ├── message-router.js  # Message routing
+│       ├── ai-processor.js    # AI processing + tags
+│       ├── commands.js        # Command handlers
+│       ├── helpers.js         # Utilities
+│       ├── mcp-client.js      # MCP integration
+│       ├── music-handler.js   # Music player
+│       ├── conversation-store.js # Chat memory
+│       ├── ram-monitor.js     # RAM monitoring
+│       ├── queue.js           # Message queue
+│       └── sensitive-actions.js # Confirmation flow
+├── setup/                # CLI setup tool
+├── scripts/              # Setup scripts
+├── openx-mcp/            # MCP server (Go)
+└── package/              # User configs
+```
+
+## License
+
+ISC
