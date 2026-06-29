@@ -2,6 +2,14 @@ import { config } from "../config.js";
 
 const REQUEST_TIMEOUT_MS = 55000;
 
+// Valid Claude models
+const VALID_CLAUDE_MODELS = [
+    "anthropic/claude-opus-4",
+    "anthropic/claude-sonnet-4",
+    "anthropic/claude-sonnet-4.5",
+    "anthropic/claude-opus-4.8",
+];
+
 /**
  * Claude API provider (FongsiDev REST API).
  * Supports: text, vision, image generation, web search, deep research.
@@ -11,7 +19,11 @@ export async function chatCompletion(messages, modelOverride = null, isComplex =
     if (!claude?.baseUrl) throw new Error("Claude base URL not configured (set OPENX_CLAUDE_BASE_URL)");
     if (!claude?.apiKey) throw new Error("Claude API key not configured (set OPENX_CLAUDE_API_KEY)");
 
-    const model = modelOverride || claude.model || "anthropic/claude-opus-4.8";
+    // Use override only if it's a valid Claude model, otherwise use config default
+    let model = claude.model || "anthropic/claude-opus-4.8";
+    if (modelOverride && VALID_CLAUDE_MODELS.includes(modelOverride)) {
+        model = modelOverride;
+    }
 
     // Convert messages to Claude format
     const parts = [];
