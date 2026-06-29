@@ -79,16 +79,28 @@ export async function chatCompletion(messages, modelOverride = null, isComplex =
         const data = await response.json();
         console.log(`[Claude] Raw response keys: ${Object.keys(data).join(', ')}`);
 
-        // Try multiple response formats
-        const content = data.choices?.[0]?.message?.content
-            || data.response
-            || data.content
-            || data.message
-            || data.data?.response
-            || data.data?.content
-            || data.result
-            || data.output
-            || "";
+        // Response structure: { developer, status, data: { ... }, message }
+        let content = "";
+
+        if (data.data) {
+            // data.data might be: string, { response }, { content }, { choices }, etc
+            if (typeof data.data === "string") {
+                content = data.data;
+            } else if (typeof data.data === "object") {
+                console.log(`[Claude] data.data keys: ${Object.keys(data.data).join(', ')}`);
+                content = data.data.response
+                    || data.data.content
+                    || data.data.message
+                    || data.data.choices?.[0]?.message?.content
+                    || data.data.text
+                    || JSON.stringify(data.data);
+            }
+        } else {
+            content = data.response
+                || data.content
+                || data.message
+                || "";
+        }
 
         console.log(`[Claude] Extracted content length: ${content.length}`);
 
