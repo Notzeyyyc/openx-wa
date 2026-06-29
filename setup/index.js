@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { initCommand } from './commands/init.js';
 import { tunnelCommand } from './commands/tunnel.js';
 import { statusCommand } from './commands/status.js';
+import { termuxCommand } from './commands/termux.js';
 
 const program = new Command();
 
@@ -14,5 +15,6 @@ program
 program.addCommand(initCommand);
 program.addCommand(tunnelCommand);
 program.addCommand(statusCommand);
+program.addCommand(termuxCommand);
 
 program.parse();
