@@ -78,8 +78,8 @@ echo -e "${YELLOW}[6/6] Starting services...${NC}"
 tmux kill-session -t openxx 2>/dev/null || true
 tmux kill-session -t openxx-mcp 2>/dev/null || true
 
-# Start bot in tmux
-tmux new-session -d -s openxx "cd $INSTALL_DIR && pnpm start"
+# Start bot in tmux (memory-optimized)
+tmux new-session -d -s openxx "cd $INSTALL_DIR && node --max-old-space-size=128 --gc-interval=100 --expose-gc index.js"
 echo -e "${GREEN}✓ Bot started in tmux session 'openxx'${NC}"
 
 # Start MCP server in tmux
@@ -96,8 +96,8 @@ cat > "$BOOT_DIR/openxx.sh" << 'BOOTEOF'
 termux-wake-lock
 sleep 5
 
-# Start bot
-tmux new-session -d -s openxx "cd ~/openxx && pnpm start"
+# Start bot (memory-optimized)
+tmux new-session -d -s openxx "cd ~/openxx && node --max-old-space-size=128 --gc-interval=100 --expose-gc index.js"
 
 # Start MCP server
 if [ -f ~/openxx/openx-mcp/openx-mcp ]; then
@@ -110,17 +110,28 @@ echo -e "${GREEN}✓ Auto-start configured (Termux:Boot)${NC}"
 # ── Keep device awake ──
 termux-wake-lock 2>/dev/null
 
+# ── Install openxx shortcut ──
+cp "$INSTALL_DIR/scripts/openxx" "$PREFIX/bin/openxx"
+chmod +x "$PREFIX/bin/openxx"
+echo -e "${GREEN}✓ Installed 'openxx' command${NC}"
+
 # ── Done ──
 echo ""
 echo -e "${CYAN}╔══════════════════════════════════════╗${NC}"
 echo -e "${CYAN}║          Setup Complete!             ║${NC}"
 echo -e "${CYAN}╚══════════════════════════════════════╝${NC}"
 echo ""
-echo -e "Commands:"
-echo -e "  ${CYAN}tmux attach -t openxx${NC}        — Lihat bot"
-echo -e "  ${CYAN}tmux attach -t openxx-mcp${NC}    — Lihat MCP"
-echo -e "  ${CYAN}Ctrl+B lalu D${NC}                — Detach tmux"
-echo -e "  ${CYAN}nano .env${NC}                    — Edit config"
-echo -e ""
+echo -e "Quick commands:"
+echo -e "  ${CYAN}openxx${NC}            — Start bot + MCP"
+echo -e "  ${CYAN}openxx stop${NC}       — Stop all"
+echo -e "  ${CYAN}openxx restart${NC}    — Restart all"
+echo -e "  ${CYAN}openxx status${NC}     — Check status"
+echo -e "  ${CYAN}openxx logs${NC}       — View bot logs"
+echo -e "  ${CYAN}openxx logs-mcp${NC}   — View MCP logs"
+echo ""
+echo -e "Other:"
+echo -e "  ${CYAN}nano .env${NC}         — Edit config"
+echo -e "  ${CYAN}tmux ls${NC}           — List sessions"
+echo ""
 echo -e "Sessions:"
 tmux ls 2>/dev/null || echo "  (no sessions)"

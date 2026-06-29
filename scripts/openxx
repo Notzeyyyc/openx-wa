@@ -1,0 +1,80 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# OpenXX CLI Shortcut
+# Usage: openxx [start|stop|restart|status|logs]
+
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+INSTALL_DIR="$HOME/openxx"
+MCP_DIR="$INSTALL_DIR/openx-mcp"
+
+case "$1" in
+  start|"")
+    echo -e "${CYAN}Starting OpenXX...${NC}"
+    termux-wake-lock 2>/dev/null
+
+    tmux kill-session -t openxx 2>/dev/null || true
+    tmux kill-session -t openxx-mcp 2>/dev/null || true
+
+    tmux new-session -d -s openxx "cd $INSTALL_DIR && node --max-old-space-size=128 --gc-interval=100 --expose-gc index.js"
+    echo -e "${GREEN}✓ Bot started${NC}"
+
+    if [ -f "$MCP_DIR/openx-mcp" ]; then
+      tmux new-session -d -s openxx-mcp "cd $MCP_DIR && ./openx-mcp"
+      echo -e "${GREEN}✓ MCP server started${NC}"
+    fi
+    echo ""
+    echo "  openxx logs    — view bot"
+    echo "  openxx stop    — stop all"
+    ;;
+
+  stop)
+    echo -e "${RED}Stopping OpenXX...${NC}"
+    tmux kill-session -t openxx 2>/dev/null && echo -e "${GREEN}✓ Bot stopped${NC}" || echo "Bot not running"
+    tmux kill-session -t openxx-mcp 2>/dev/null && echo -e "${GREEN}✓ MCP stopped${NC}" || echo "MCP not running"
+    ;;
+
+  restart)
+    $0 stop
+    sleep 1
+    $0 start
+    ;;
+
+  status)
+    echo -e "${CYAN}=== OpenXX Status ===${NC}"
+    echo ""
+    if tmux has-session -t openxx 2>/dev/null; then
+      echo -e "Bot:    ${GREEN}running${NC}"
+    else
+      echo -e "Bot:    ${RED}stopped${NC}"
+    fi
+    if tmux has-session -t openxx-mcp 2>/dev/null; then
+      echo -e "MCP:    ${GREEN}running${NC}"
+    else
+      echo -e "MCP:    ${RED}stopped${NC}"
+    fi
+    echo ""
+    tmux ls 2>/dev/null || true
+    ;;
+
+  logs)
+    tmux attach -t openxx
+    ;;
+
+  logs-mcp)
+    tmux attach -t openxx-mcp
+    ;;
+
+  *)
+    echo "Usage: openxx [start|stop|restart|status|logs|logs-mcp]"
+    echo ""
+    echo "  start     Start bot + MCP (default)"
+    echo "  stop      Stop all services"
+    echo "  restart   Restart all services"
+    echo "  status    Show running status"
+    echo "  logs      View bot logs"
+    echo "  logs-mcp  View MCP server logs"
+    ;;
+esac
