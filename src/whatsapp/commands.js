@@ -7,6 +7,7 @@ import { pendingSensitiveActions, executeSensitiveAction } from './sensitive-act
 import { cancelBgTask, getBgStatusText } from './queue.js';
 import { searchAndDownload } from './music-handler.js';
 import { clearHistory } from './conversation-store.js';
+import { getRamReport, getRamTrend, forceGarbageCollect } from './ram-monitor.js';
 import { log } from '../logger.js';
 
 const SENSITIVE_TTL_MS = 2 * 60 * 1000;
@@ -188,6 +189,39 @@ export async function handleCommands(from, textMessage, msg, waSock) {
     if (/^(reset|clear|hapus memory| baru)$/i.test(textMessage.trim())) {
         clearHistory(from);
         await waSock.sendMessage(from, { text: "✅ Memory direset. Mulai percakapan baru!" }, { quoted: msg });
+        return true;
+    }
+
+    // RAM Monitor
+    if (/^(ram|memory|mem|status ram)$/i.test(textMessage.trim())) {
+        const report = getRamReport();
+        await waSock.sendMessage(from, { text: report }, { quoted: msg });
+        return true;
+    }
+
+    // RAM Trend
+    if (/^(ram trend|ram history)$/i.test(textMessage.trim())) {
+        const trend = getRamTrend();
+        if (!trend) {
+            await waSock.sendMessage(from, { text: "⚠️ Belum cukup data (butuh minimal 2 reading)" }, { quoted: msg });
+        } else {
+            const msg_text = `📈 *RAM Trend* (last ${trend.samples} min)\n\nAvg: ${trend.avg}%\nMax: ${trend.max}%\nMin: ${trend.min}%`;
+            await waSock.sendMessage(from, { text: msg_text }, { quoted: msg });
+        }
+        return true;
+    }
+
+    // Force GC
+    if (/^(gc|garbage collect|bersihkan memory)$/i.test(textMessage.trim())) {
+        const before = process.memoryUsage().heapUsed;
+        const ok = forceGarbageCollect();
+        if (ok) {
+            const after = process.memoryUsage().heapUsed;
+            const freed = ((before - after) / 1024 / 1024).toFixed(2);
+            await waSock.sendMessage(from, { text: `🗑️ GC selesai. Freed: ${freed} MB` }, { quoted: msg });
+        } else {
+            await waSock.sendMessage(from, { text: "⚠️ GC tidak tersedia (jalankan dengan --expose-gc)" }, { quoted: msg });
+        }
         return true;
     }
 
