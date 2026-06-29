@@ -4,7 +4,7 @@ import { chatCompletion } from '../ai-provider.js';
 import { loadJsonConfig } from '../config.js';
 import { handleMcpTags } from './mcp-client.js';
 import { error as logError } from '../logger.js';
-import { loadHistory, saveMessage } from './conversation-store.js';
+import { loadHistory, saveMessage, getRecentMessages } from './conversation-store.js';
 import {
     getDeviceInfo, getAppList, takeScreenshot, sendNotification,
     getHealthStatus, launchApp, tapByText, tapByResourceId,
