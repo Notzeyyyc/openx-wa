@@ -11,10 +11,15 @@ import { handleCommands } from './commands.js';
 import { aiQueue, processQueue } from './queue.js';
 
 export function setupMessageHandler(waSock) {
+    logFn("[DEBUG] Message handler initialized");
     waSock.ev.on('messages.upsert', async (m) => {
         try {
+            logFn(`[DEBUG] messages.upsert triggered, count=${m.messages?.length}`);
             const msg = m.messages[0];
-            if (!msg.message) return;
+            if (!msg.message) {
+                logFn("[DEBUG] msg.message is empty, skipping");
+                return;
+            }
 
             const from = msg.key.remoteJid;
             const participant = msg.key.participant || from;
