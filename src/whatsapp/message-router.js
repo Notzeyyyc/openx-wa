@@ -24,6 +24,8 @@ export function setupMessageHandler(waSock) {
             const from = msg.key.remoteJid;
             const participant = msg.key.participant || from;
 
+            logFn(`[DEBUG] from=${from}, fromMe=${msg.key.fromMe}, pushName=${msg.pushName}`);
+
             let waConfig = { statusTargets: [], adminChannels: [] };
             try { waConfig = loadJsonConfig("./package/wa_config.json", waConfig); } catch(e) {}
 
@@ -78,6 +80,8 @@ export function setupMessageHandler(waSock) {
             const isMedia = msg.message.imageMessage || msg.message.documentMessage || msg.message.videoMessage || msg.message.audioMessage;
             const isGroup = from.endsWith('@g.us');
             const lowerText = textMessage ? textMessage.trim().toLowerCase() : '';
+
+            logFn(`[DEBUG] textMessage="${textMessage}", isMedia=${!!isMedia}, isGroup=${isGroup}`);
 
             if (textMessage) {
                 logFn(`Received WhatsApp message from ${from}: ${textMessage}`);
