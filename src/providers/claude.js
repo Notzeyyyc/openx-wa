@@ -77,11 +77,20 @@ export async function chatCompletion(messages, modelOverride = null, isComplex =
         }
 
         const data = await response.json();
+        console.log(`[Claude] Raw response keys: ${Object.keys(data).join(', ')}`);
+
+        // Try multiple response formats
         const content = data.choices?.[0]?.message?.content
             || data.response
             || data.content
             || data.message
+            || data.data?.response
+            || data.data?.content
+            || data.result
+            || data.output
             || "";
+
+        console.log(`[Claude] Extracted content length: ${content.length}`);
 
         console.log(`[Claude] Success: ${content.length} chars`);
         return content;
