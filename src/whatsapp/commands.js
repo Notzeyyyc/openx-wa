@@ -6,6 +6,7 @@ import {
 import { pendingSensitiveActions, executeSensitiveAction } from './sensitive-actions.js';
 import { cancelBgTask, getBgStatusText } from './queue.js';
 import { searchAndDownload } from './music-handler.js';
+import { clearHistory } from './conversation-store.js';
 import { log } from '../logger.js';
 
 const SENSITIVE_TTL_MS = 2 * 60 * 1000;
@@ -180,6 +181,13 @@ export async function handleCommands(from, textMessage, msg, waSock) {
         } else {
             await waSock.sendMessage(from, { text: "❓ *Model Commands:*\n.model list\n.model select [NAME]" }, { quoted: msg });
         }
+        return true;
+    }
+
+    // Reset Conversation History
+    if (/^(reset|clear|hapus memory| baru)$/i.test(textMessage.trim())) {
+        clearHistory(from);
+        await waSock.sendMessage(from, { text: "✅ Memory direset. Mulai percakapan baru!" }, { quoted: msg });
         return true;
     }
 

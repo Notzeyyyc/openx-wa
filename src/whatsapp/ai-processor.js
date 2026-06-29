@@ -4,6 +4,7 @@ import { chatCompletion } from '../ai-provider.js';
 import { loadJsonConfig } from '../config.js';
 import { handleMcpTags } from './mcp-client.js';
 import { error as logError } from '../logger.js';
+import { loadHistory, saveMessage } from './conversation-store.js';
 import {
     getDeviceInfo, getAppList, takeScreenshot, sendNotification,
     getHealthStatus, launchApp, tapByText, tapByResourceId,
@@ -118,12 +119,19 @@ PENTING: [NEEDS_ADB_INFO] HANYA pakai kalau user nanya spesifik soal device, app
     const personalityPrompt = activeProfile ? activeProfile.prompt : "Lu adalah OPENX, asisten AI khusus buat pelajar.";
 
     const systemPrompt = personalityPrompt + schedulesContext + storageContext + serverStatus + aiRules;
-    
+
+    // Load conversation history for context
+    const history = from ? getRecentMessages(from, 10) : [];
+
     let messages = [
         { role: "system", content: systemPrompt },
+        ...history,
         { role: "user", content: userMessage }
     ];
-    
+
+    // Save user message to history
+    if (from) saveMessage(from, 'user', userMessage);
+
     let aiResult = await chatCompletion(messages, getCurrentModel(), isComplex, from) || "";
     
     // Handle dynamic ADB info request
@@ -364,6 +372,9 @@ PENTING: [NEEDS_ADB_INFO] HANYA pakai kalau user nanya spesifik soal device, app
     // ── MCP Tag Handlers ──────────────────────────────────────────────
     aiResult = await handleMcpTags(aiResult, from, waSock);
     // ── End MCP Tags ──────────────────────────────────────────────────
-    
+
+    // Save AI response to history
+    if (from && aiResult) saveMessage(from, 'assistant', aiResult);
+
     return aiResult.trim();
 }

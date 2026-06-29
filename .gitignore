@@ -7,6 +7,7 @@ package/wa_read_cache.json
 package/schedules.json
 package/storage/*
 !package/storage/.gitkeep
+package/conversations/
 
 # Build artifacts
 openx-mcp/*.exe
