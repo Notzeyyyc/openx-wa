@@ -1,0 +1,22 @@
+# Build artifacts
+openamd
+openarm
+openx-v2
+*.exe
+
+# Runtime data
+openx-memory.json
+openx-cache/
+openx-crashes/
+openx.log
+
+# Docker
+.docker/
+
+# IDE
+.cursor/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

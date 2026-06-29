@@ -1,0 +1,14 @@
+{
+  "$schema": "./plugins.schema.json",
+  "plugins": [
+    {
+      "id": "ping",
+      "entry": "./plugins/ping.mjs",
+      "enabled": true,
+      "sandbox": false,
+      "permissions": ["wa.send"]
+    }
+  ]
+
+}
+

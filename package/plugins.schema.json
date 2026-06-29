@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OpenX Plugin Config",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "plugins": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "entry": { "type": "string", "minLength": 1 },
+          "enabled": { "type": "boolean", "default": true },
+          "sandbox": { "type": "boolean", "default": false },
+          "permissions": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": []
+          }
+        },
+        "required": ["id", "entry"]
+      },
+      "default": []
+    }
+  },
+  "required": ["plugins"]
+}
+

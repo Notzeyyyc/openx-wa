@@ -1,0 +1,17 @@
+node_modules/
+mimocode.json
+caches/
+log.txt
+.env
+package/wa_read_cache.json
+package/schedules.json
+package/storage/*
+!package/storage/.gitkeep
+
+# Build artifacts
+openx-mcp/*.exe
+openx-mcp/*-termux
+openx-mcp/*.tar.gz
+
+# Leftover old source (if any remains)
+package/openx/
