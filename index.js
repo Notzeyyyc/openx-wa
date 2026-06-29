@@ -64,6 +64,20 @@ async function connectADB() {
         return;
     }
 
+    // Root mode: force ADB TCP via su
+    if (config.adbPort === "root") {
+        try {
+            await execPromise('su -c "setprop service.adb.tcp.port 5555 && stop adbd && start adbd"');
+            log("⏳ Waiting for adbd to restart...");
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            const { stdout } = await execPromise('adb connect localhost:5555');
+            log(`✅ ADB (root): ${stdout.trim()}`);
+        } catch (e) {
+            logError("Root ADB failed (is su available?):", e);
+        }
+        return;
+    }
+
     // TCP auto-detect
     if (config.adbPort === "auto") {
         await detectAdbPort();
@@ -71,12 +85,12 @@ async function connectADB() {
     }
 
     // Fixed TCP port
-    log(`⏳ Auto-connecting to localhost:${config.adbPort}...`);
+    log(`⏳ Connecting to localhost:${config.adbPort}...`);
     try {
         const { stdout } = await execPromise(`adb connect localhost:${config.adbPort}`);
         log(`✅ ADB: ${stdout.trim()}`);
     } catch (e) {
-        logError("ADB Auto-connect failed:", e);
+        logError("ADB connect failed:", e);
     }
 }
 
