@@ -86,6 +86,13 @@ export const config = {
             apiKey: process.env.OPENX_OPENAI_API_KEY || "",
             model: process.env.OPENX_OPENAI_MODEL || "gpt-4o-mini",
         },
+        claude: {
+            baseUrl: process.env.OPENX_CLAUDE_BASE_URL || "https://fgsi.dpdns.org/api/ai/claude",
+            apiKey: process.env.OPENX_CLAUDE_API_KEY || "",
+            model: process.env.OPENX_CLAUDE_MODEL || "anthropic/claude-opus-4.8",
+            webSearch: (process.env.OPENX_CLAUDE_WEB_SEARCH || "false") === "true",
+            deepResearch: (process.env.OPENX_CLAUDE_DEEP_RESEARCH || "false") === "true",
+        },
     },
     openrouter: {
         get apiKeys() { return splitCsv(process.env.OPENX_OPENROUTER_API_KEYS); },
