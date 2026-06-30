@@ -1,4 +1,5 @@
 import { config } from "./config.js";
+import { getMainApiKey } from "./ai-config.js";
 
 // Provider cache: name -> { complete, name }
 const providerCache = new Map();
@@ -57,6 +58,13 @@ async function loadProvider(name) {
  */
 export async function chatCompletion(messages, model = null, isComplex = false, userJid = null, providerOverride = null) {
     const providerName = providerOverride || config.ai?.provider || "openrouter";
+
+    // Inject API key from ai-config if not in env
+    const apiKey = getMainApiKey();
+    if (apiKey && config.ai?.[providerName]) {
+        config.ai[providerName].apiKey = apiKey;
+    }
+
     const provider = await loadProvider(providerName);
     return provider.complete(messages, model, isComplex, userJid);
 }
