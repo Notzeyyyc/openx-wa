@@ -260,6 +260,22 @@ export async function handleCommands(from, textMessage, msg, waSock) {
             return true;
         }
 
+        if (sub === 'phone') {
+            const phone = args[2]?.trim();
+            if (!phone) {
+                await waSock.sendMessage(from, { text: "❓ Usage: .ai phone <number>\nExample: .ai phone 628123456789" }, { quoted: msg });
+                return true;
+            }
+            // Update .env directly
+            const fs = await import('fs');
+            let env = fs.readFileSync('./.env', 'utf-8');
+            env = env.replace(/^OPENX_DEV_PHONE_NUMBER=.*/m, `OPENX_DEV_PHONE_NUMBER=${phone}`);
+            fs.writeFileSync('./.env', env);
+            process.env.OPENX_DEV_PHONE_NUMBER = phone;
+            await waSock.sendMessage(from, { text: `✅ Phone number set to: ${phone}` }, { quoted: msg });
+            return true;
+        }
+
         if (sub === 'agentkey') {
             const agentType = args[2];
             const apiKey = args.slice(3).join(' ').trim();
@@ -273,7 +289,7 @@ export async function handleCommands(from, textMessage, msg, waSock) {
         }
 
         await waSock.sendMessage(from, {
-            text: `❓ *AI Commands:*\n.ai status — lihat config\n.ai provider <name> — ganti provider\n.ai model <name> — ganti model\n.ai apikey <key> — set API key\n.ai agentkey <type> <key> — set agent API key\n.ai agent <type> <provider> [model] — set agent`
+            text: `❓ *AI Commands:*\n.ai status — lihat config\n.ai phone <number> — set nomor WA admin\n.ai provider <name> — ganti provider\n.ai model <name> — ganti model\n.ai apikey <key> — set API key\n.ai agentkey <type> <key> — set agent API key\n.ai agent <type> <provider> [model] — set agent`
         }, { quoted: msg });
         return true;
     }

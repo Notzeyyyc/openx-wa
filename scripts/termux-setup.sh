@@ -70,30 +70,20 @@ if [ ! -f ".env" ]; then
     cp .env.example .env
 fi
 
-# Interactive .env setup (minimal)
-echo ""
-echo -e "${CYAN}=== Quick Setup ===${NC}"
-echo ""
-
-# WhatsApp number
-echo -n "WhatsApp admin number (e.g. 628123456789): "
-read WA_NUMBER
-WA_NUMBER=${WA_NUMBER:-""}
-
-# MCP Token (auto-generated)
+# Generate MCP token
 MCP_TOKEN=$(openssl rand -hex 32 2>/dev/null || head -c 64 /dev/urandom | od -An -tx1 | tr -d ' \n' | head -c 64)
 
-# Write .env
+# Write .env with defaults (user configures via WhatsApp later)
 cat > .env << EOF
 # OpenXX Configuration
 
-# WhatsApp admin phone number
-OPENX_DEV_PHONE_NUMBER=$WA_NUMBER
+# WhatsApp admin phone number (set via: .ai phone <number>)
+OPENX_DEV_PHONE_NUMBER=
 
-# AI Provider (configure later via WhatsApp: .ai provider <name>)
+# AI Provider (set via: .ai provider <name>)
 OPENX_AI_PROVIDER=openai
 
-# OpenAI-compatible (configure later via WhatsApp: .ai model <name>)
+# OpenAI-compatible (set via: .ai model <name>)
 OPENX_OPENAI_BASE_URL=https://ai.sumopod.com
 OPENX_OPENAI_API_KEY=
 OPENX_OPENAI_MODEL=gpt-4o-mini
@@ -106,11 +96,12 @@ OPENX_MCP_URL=http://localhost:8765
 OPENX_MCP_API_KEY=$MCP_TOKEN
 EOF
 
-echo -e "\n${GREEN}✓ .env configured${NC}"
+echo -e "${GREEN}✓ .env configured with defaults${NC}"
 echo -e "${CYAN}MCP Token: $MCP_TOKEN${NC}"
 echo ""
-echo -e "${YELLOW}Configure AI provider later via WhatsApp:${NC}"
+echo -e "${YELLOW}Configure everything via WhatsApp after bot starts:${NC}"
 echo -e "  ${CYAN}.ai provider <name>${NC} — openrouter, openai, claude, chatgpt, gemini"
+echo -e "  ${CYAN}.ai apikey <key>${NC} — set API key"
 echo -e "  ${CYAN}.ai model <name>${NC} — set model"
 echo -e "  ${CYAN}.ai status${NC} — check config"
 
