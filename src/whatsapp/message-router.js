@@ -9,9 +9,11 @@ import { askAI } from './ai-processor.js';
 import { stripMarkdown, saveLocalFile, getLocalFileById } from './helpers.js';
 import { handleCommands } from './commands.js';
 import { aiQueue, processQueue } from './queue.js';
+import { getGroup, checkSpam, checkAutoReply, setupGroupParticipants } from './group-manager.js';
 
 export function setupMessageHandler(waSock) {
     logFn("[DEBUG] Message handler initialized");
+    setupGroupParticipants(waSock);
     waSock.ev.on('messages.upsert', async (m) => {
         try {
             logFn(`[DEBUG] messages.upsert triggered, count=${m.messages?.length}`);
@@ -82,6 +84,26 @@ export function setupMessageHandler(waSock) {
             const lowerText = textMessage ? textMessage.trim().toLowerCase() : '';
 
             logFn(`[DEBUG] textMessage="${textMessage}", isMedia=${!!isMedia}, isGroup=${isGroup}`);
+
+            // Group checks
+            if (isGroup) {
+                const group = getGroup(from);
+                if (group?.muted) return;
+                if (group?.spam_protection && textMessage) {
+                    const spam = checkSpam(from, participant, textMessage);
+                    if (spam.spam) {
+                        logFn(`[Spam] ${spam.reason} from ${participant} in ${from}`);
+                        return;
+                    }
+                }
+                if (group?.auto_reply_enabled && textMessage) {
+                    const reply = checkAutoReply(textMessage);
+                    if (reply) {
+                        await waSock.sendMessage(from, { text: reply });
+                        return;
+                    }
+                }
+            }
 
             if (textMessage) {
                 logFn(`Received WhatsApp message from ${from}: ${textMessage}`);

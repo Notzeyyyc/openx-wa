@@ -8,6 +8,7 @@ import { cancelBgTask, getBgStatusText } from './queue.js';
 import { searchAndDownload } from './music-handler.js';
 import { clearHistory } from './conversation-store.js';
 import { getRamReport, getRamTrend, forceGarbageCollect } from './ram-monitor.js';
+import { getGroup, setGroup } from './group-manager.js';
 import { log } from '../logger.js';
 
 const SENSITIVE_TTL_MS = 2 * 60 * 1000;
@@ -261,6 +262,79 @@ export async function handleCommands(from, textMessage, msg, waSock) {
             await waSock.sendMessage(from, { text: `❌ Gagal download audio: ${e.message}` }, { quoted: msg });
         }
 
+        return true;
+    }
+
+    // Group Management Commands
+    if (lowerText.startsWith('.group')) {
+        const isGroup = from.endsWith('@g.us');
+        if (!isGroup) {
+            await waSock.sendMessage(from, { text: "❌ Group commands only work in groups." }, { quoted: msg });
+            return true;
+        }
+
+        const args = textMessage.trim().split(/\s+/);
+        const sub = args[1]?.toLowerCase();
+        const group = getGroup(from) || {};
+
+        if (sub === 'settings') {
+            const status = [
+                `⚙️ *Group Settings*`,
+                `Welcome: ${group.welcome_enabled ? '✅ ON' : '❌ OFF'}`,
+                `Welcome msg: ${group.welcome_message || '(default)'}`,
+                `Anti-spam: ${group.spam_protection ? '✅ ON' : '❌ OFF'}`,
+                `Auto-reply: ${group.auto_reply_enabled ? '✅ ON' : '❌ OFF'}`,
+                `Muted: ${group.muted ? '🔇 YES' : '🔊 NO'}`
+            ].join('\n');
+            await waSock.sendMessage(from, { text: status }, { quoted: msg });
+        } else if (sub === 'welcome') {
+            const val = args[2]?.toLowerCase();
+            if (val === 'on') {
+                setGroup(from, { welcome_enabled: true });
+                await waSock.sendMessage(from, { text: "✅ Welcome message enabled." }, { quoted: msg });
+            } else if (val === 'off') {
+                setGroup(from, { welcome_enabled: false });
+                await waSock.sendMessage(from, { text: "❌ Welcome message disabled." }, { quoted: msg });
+            } else {
+                const msgText = args.slice(2).join(' ');
+                if (msgText) {
+                    setGroup(from, { welcome_message: msgText });
+                    await waSock.sendMessage(from, { text: `✅ Welcome message set to:\n${msgText}` }, { quoted: msg });
+                } else {
+                    await waSock.sendMessage(from, { text: "❓ Usage: .group welcome on/off/<message>" }, { quoted: msg });
+                }
+            }
+        } else if (sub === 'spam') {
+            const val = args[2]?.toLowerCase();
+            if (val === 'on') {
+                setGroup(from, { spam_protection: true });
+                await waSock.sendMessage(from, { text: "✅ Anti-spam enabled." }, { quoted: msg });
+            } else if (val === 'off') {
+                setGroup(from, { spam_protection: false });
+                await waSock.sendMessage(from, { text: "❌ Anti-spam disabled." }, { quoted: msg });
+            } else {
+                await waSock.sendMessage(from, { text: "❓ Usage: .group spam on/off" }, { quoted: msg });
+            }
+        } else if (sub === 'reply') {
+            const val = args[2]?.toLowerCase();
+            if (val === 'on') {
+                setGroup(from, { auto_reply_enabled: true });
+                await waSock.sendMessage(from, { text: "✅ Auto-reply enabled." }, { quoted: msg });
+            } else if (val === 'off') {
+                setGroup(from, { auto_reply_enabled: false });
+                await waSock.sendMessage(from, { text: "❌ Auto-reply disabled." }, { quoted: msg });
+            } else {
+                await waSock.sendMessage(from, { text: "❓ Usage: .group reply on/off" }, { quoted: msg });
+            }
+        } else if (sub === 'mute') {
+            setGroup(from, { muted: true });
+            await waSock.sendMessage(from, { text: "🔇 Bot muted in this group." }, { quoted: msg });
+        } else if (sub === 'unmute') {
+            setGroup(from, { muted: false });
+            await waSock.sendMessage(from, { text: "🔊 Bot unmuted." }, { quoted: msg });
+        } else {
+            await waSock.sendMessage(from, { text: "❓ *Group Commands:*\n.group settings\n.group welcome on/off/<msg>\n.group spam on/off\n.group reply on/off\n.group mute/unmute" }, { quoted: msg });
+        }
         return true;
     }
 
