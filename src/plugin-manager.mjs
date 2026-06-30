@@ -80,27 +80,46 @@ function makeHostApi(pluginId, granted) {
 
     return {
         wa: {
-            /** @param {{jid: string, text: string}} args */
-            async sendText(args) {
+            async send(jid, msg) {
                 requirePerm('wa.send');
                 if (!sendMessage) throw new Error('sendMessage not initialised');
-                const jid = String(args?.jid || '').trim();
-                const text = String(args?.text || '');
-                if (!jid) throw new Error('jid is required');
-                await sendMessage(jid, { text });
+                await sendMessage(jid, msg);
+                return { ok: true };
+            },
+            async react(jid, msgId, emoji) {
+                requirePerm('wa.send');
+                const { waSock } = await import('./whatsapp/connection.js');
+                if (waSock) await waSock.sendMessage(jid, { react: { text: emoji, key: msgId } });
                 return { ok: true };
             }
         },
         ai: {
-            /**
-             * Proxy to OpenRouter chatCompletion.
-             * @param {{messages: Array<{role: string, content: string}>, model?: string, isComplex?: boolean}} args
-             */
-            async chat(args) {
+            async chat(messages, model) {
                 requirePerm('ai.chat');
                 const { chatCompletion } = await import('./ai-provider.js');
-                const messages = Array.isArray(args?.messages) ? args.messages : [];
-                return await chatCompletion(messages, args?.model ?? null, !!args?.isComplex);
+                return await chatCompletion(messages, model);
+            },
+            async vision(imageUrl, prompt) {
+                requirePerm('ai.vision');
+                const { chatCompletion } = await import('./ai-provider.js');
+                return await chatCompletion([
+                    { role: 'user', content: `Analyze this image: ${imageUrl}\nQuestion: ${prompt}` }
+                ]);
+            },
+            async image(prompt) {
+                requirePerm('ai.image');
+                const res = await fetch(config.ai.claude.baseUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({
+                        apikey: config.ai.claude.apiKey,
+                        messages: [{ id: Date.now(), role: 'user', parts: [{ type: 'text', text: prompt }] }],
+                        model: config.ai.claude.model,
+                        isImageGenerationMode: true
+                    })
+                });
+                const data = await res.json();
+                return data.data?.url || data.data?.response || '';
             }
         }
     };
@@ -128,8 +147,11 @@ function makeSandboxProxy(pluginId, childProc, granted) {
                 const host = makeHostApi(pluginId, granted);
                 const { method, params } = msg.params || {};
                 let res;
-                if (method === 'wa.sendText') res = await host.wa.sendText(params);
-                else if (method === 'ai.chat') res = await host.ai.chat(params);
+                if (method === 'wa.send') res = await host.wa.send(params.jid, params.msg);
+                else if (method === 'wa.react') res = await host.wa.react(params.jid, params.msgId, params.emoji);
+                else if (method === 'ai.chat') res = await host.ai.chat(params.messages, params.model);
+                else if (method === 'ai.vision') res = await host.ai.vision(params.imageUrl, params.prompt);
+                else if (method === 'ai.image') res = await host.ai.image(params.prompt);
                 else throw new Error(`Unknown host method: ${method}`);
                 childProc.send({ type: 'rpc_res', id: msg.id, ok: true, result: res });
             } catch (e) {
@@ -303,6 +325,11 @@ export function listPlugins() {
     }));
 }
 
+export async function reloadPlugins({ notify, sendMessageFn }) {
+    loaded.clear();
+    await initPluginManager({ notify, sendMessageFn });
+}
+
 export async function handlePluginCommand(jid, text) {
     const lower = String(text || '').trim().toLowerCase();
     if (!lower) return false;
@@ -313,6 +340,88 @@ export async function handlePluginCommand(jid, text) {
             ? rows.map(p => `- ${p.id} (sandbox=${p.sandbox ? 'ON' : 'OFF'}) perms=[${p.permissions.join(', ') || '-'}]`).join('\n')
             : '(kosong)';
         if (sendMessage) await sendMessage(jid, { text: `🧩 *Plugins*\n\n${lines}` });
+        return true;
+    }
+
+    if (lower.startsWith('.plugin ')) {
+        const args = text.trim().split(/\s+/);
+        const sub = args[1]?.toLowerCase();
+
+        if (sub === 'list') {
+            const rows = listPlugins();
+            const lines = rows.length
+                ? rows.map(p => `- ${p.id} (sandbox=${p.sandbox ? 'ON' : 'OFF'}) perms=[${p.permissions.join(', ') || '-'}]`).join('\n')
+                : '(kosong)';
+            if (sendMessage) await sendMessage(jid, { text: `🧩 *Plugins*\n\n${lines}` });
+            return true;
+        }
+
+        if (sub === 'reload') {
+            try {
+                await reloadPlugins({ notify: notifyFn, sendMessageFn: sendMessage });
+                if (sendMessage) await sendMessage(jid, { text: '✅ Plugin system reloaded.' });
+            } catch (e) {
+                if (sendMessage) await sendMessage(jid, { text: `❌ Reload failed: ${e.message}` });
+            }
+            return true;
+        }
+
+        if (sub === 'install') {
+            const pluginPath = args[2];
+            if (!pluginPath) {
+                if (sendMessage) await sendMessage(jid, { text: '❓ Usage: .plugin install <path>' });
+                return true;
+            }
+            const cfg = safeJsonRead(PLUGINS_CFG_PATH, { plugins: [] });
+            const id = path.basename(pluginPath, path.extname(pluginPath));
+            if (cfg.plugins.find(p => p.id === id)) {
+                if (sendMessage) await sendMessage(jid, { text: `❌ Plugin ${id} already installed.` });
+                return true;
+            }
+            cfg.plugins.push({ id, entry: pluginPath, enabled: true, sandbox: false, permissions: [] });
+            fs.writeFileSync(PLUGINS_CFG_PATH, JSON.stringify(cfg, null, 2));
+            if (sendMessage) await sendMessage(jid, { text: `✅ Plugin ${id} added. Use .plugin reload to activate.` });
+            return true;
+        }
+
+        if (sub === 'remove') {
+            const id = args[2];
+            if (!id) {
+                if (sendMessage) await sendMessage(jid, { text: '❓ Usage: .plugin remove <id>' });
+                return true;
+            }
+            const cfg = safeJsonRead(PLUGINS_CFG_PATH, { plugins: [] });
+            const idx = cfg.plugins.findIndex(p => p.id === id);
+            if (idx === -1) {
+                if (sendMessage) await sendMessage(jid, { text: `❌ Plugin ${id} not found.` });
+                return true;
+            }
+            cfg.plugins.splice(idx, 1);
+            fs.writeFileSync(PLUGINS_CFG_PATH, JSON.stringify(cfg, null, 2));
+            loaded.delete(id);
+            if (sendMessage) await sendMessage(jid, { text: `✅ Plugin ${id} removed. Use .plugin reload to apply.` });
+            return true;
+        }
+
+        if (sub === 'enable' || sub === 'disable') {
+            const id = args[2];
+            if (!id) {
+                if (sendMessage) await sendMessage(jid, { text: `❓ Usage: .plugin ${sub} <id>` });
+                return true;
+            }
+            const cfg = safeJsonRead(PLUGINS_CFG_PATH, { plugins: [] });
+            const p = cfg.plugins.find(p => p.id === id);
+            if (!p) {
+                if (sendMessage) await sendMessage(jid, { text: `❌ Plugin ${id} not found.` });
+                return true;
+            }
+            p.enabled = sub === 'enable';
+            fs.writeFileSync(PLUGINS_CFG_PATH, JSON.stringify(cfg, null, 2));
+            if (sendMessage) await sendMessage(jid, { text: `✅ Plugin ${id} ${sub === 'enable' ? 'enabled' : 'disabled'}. Use .plugin reload to apply.` });
+            return true;
+        }
+
+        if (sendMessage) await sendMessage(jid, { text: '❓ *Plugin Commands:*\n.plugin list\n.plugin install <path>\n.plugin remove <id>\n.plugin reload\n.plugin enable <id>\n.plugin disable <id>' });
         return true;
     }
 

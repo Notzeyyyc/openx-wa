@@ -10,6 +10,8 @@ import { clearHistory } from './conversation-store.js';
 import { getRamReport, getRamTrend, forceGarbageCollect } from './ram-monitor.js';
 import { getGroup, setGroup } from './group-manager.js';
 import { log } from '../logger.js';
+import { getStatsSummary } from '../analytics.js';
+import { handlePluginCommand, reloadPlugins } from '../plugin-manager.mjs';
 
 const SENSITIVE_TTL_MS = 2 * 60 * 1000;
 
@@ -226,6 +228,23 @@ export async function handleCommands(from, textMessage, msg, waSock) {
         return true;
     }
 
+    // Analytics Stats
+    if (/^(stats|statistik|analytics)$/i.test(textMessage.trim())) {
+        const stats = getStatsSummary();
+        const msg_text = `📊 *Statistics (Today)*\n\n` +
+            `Messages: ${stats.today.messages}\n` +
+            `AI Calls: ${stats.today.aiCalls}\n` +
+            `Commands: ${stats.today.commands}\n` +
+            `Errors: ${stats.today.errors}\n` +
+            `Avg Response: ${stats.today.avgResponseTime}ms\n\n` +
+            `*Top Commands:*\n` +
+            (stats.topCommands.length > 0
+                ? stats.topCommands.map(([cmd, count]) => `${cmd}: ${count}`).join('\n')
+                : 'No commands used today');
+        await waSock.sendMessage(from, { text: msg_text }, { quoted: msg });
+        return true;
+    }
+
     // Music Player
     const playMatch = textMessage.trim().match(/^\.play\s+(.+)$/i);
     if (playMatch) {
@@ -336,6 +355,12 @@ export async function handleCommands(from, textMessage, msg, waSock) {
             await waSock.sendMessage(from, { text: "❓ *Group Commands:*\n.group settings\n.group welcome on/off/<msg>\n.group spam on/off\n.group reply on/off\n.group mute/unmute" }, { quoted: msg });
         }
         return true;
+    }
+
+    // Plugin Commands
+    if (lowerText.startsWith('.plugin')) {
+        const result = await handlePluginCommand(from, textMessage.trim());
+        if (result) return true;
     }
 
     return false; // Not handled

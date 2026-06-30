@@ -122,6 +122,10 @@ export function getStats(since) {
   return all('SELECT event, COUNT(*) as count FROM analytics WHERE timestamp >= ? GROUP BY event', [since]);
 }
 
+export function getAnalyticsEvents(since) {
+  return all('SELECT event, chat_id, metadata, timestamp FROM analytics WHERE timestamp >= ? ORDER BY timestamp DESC', [since]);
+}
+
 // Plugins
 export function getPlugin(id) {
   return get('SELECT * FROM plugins WHERE id = ?', [id]);

@@ -10,6 +10,7 @@ import { stripMarkdown, saveLocalFile, getLocalFileById } from './helpers.js';
 import { handleCommands } from './commands.js';
 import { aiQueue, processQueue } from './queue.js';
 import { getGroup, checkSpam, checkAutoReply, setupGroupParticipants } from './group-manager.js';
+import { trackMessage, trackCommand } from '../analytics.js';
 
 export function setupMessageHandler(waSock) {
     logFn("[DEBUG] Message handler initialized");
@@ -85,6 +86,9 @@ export function setupMessageHandler(waSock) {
 
             logFn(`[DEBUG] textMessage="${textMessage}", isMedia=${!!isMedia}, isGroup=${isGroup}`);
 
+            // Track incoming message
+            trackMessage(from, isGroup);
+
             // Group checks
             if (isGroup) {
                 const group = getGroup(from);
@@ -141,7 +145,10 @@ export function setupMessageHandler(waSock) {
 
                 // Handle commands
                 const cmdHandled = await handleCommands(from, textMessage, msg, waSock);
-                if (cmdHandled) return;
+                if (cmdHandled) {
+                    trackCommand(from, textMessage.trim().split(/\s+/)[0]);
+                    return;
+                }
 
                 // Plugin system hook
                 // (import handlePluginsMessage from plugin_manager when ready)

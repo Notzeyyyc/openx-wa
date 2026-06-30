@@ -36,13 +36,22 @@ async function rpcHostCall(method, params) {
 function makeHost() {
     return {
         wa: {
-            async sendText(args) {
-                return await rpcHostCall('wa.sendText', args);
+            async send(jid, msg) {
+                return await rpcHostCall('wa.send', { jid, msg });
+            },
+            async react(jid, msgId, emoji) {
+                return await rpcHostCall('wa.react', { jid, msgId, emoji });
             }
         },
         ai: {
-            async chat(args) {
-                return await rpcHostCall('ai.chat', args);
+            async chat(messages, model) {
+                return await rpcHostCall('ai.chat', { messages, model });
+            },
+            async vision(imageUrl, prompt) {
+                return await rpcHostCall('ai.vision', { imageUrl, prompt });
+            },
+            async image(prompt) {
+                return await rpcHostCall('ai.image', { prompt });
             }
         }
     };

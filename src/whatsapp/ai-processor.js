@@ -14,6 +14,7 @@ import { downloadMedia } from '../downloader.js';
 import { queueSensitiveAction, sendSensitiveConfirmationPrompt } from './sensitive-actions.js';
 import { enqueueBgFlow, processAdbBgQueue } from './queue.js';
 import { waSock } from './connection.js';
+import { trackAIResponse } from '../analytics.js';
 
 let targetModel = "stepfun/step-3.5-flash:free";
 
@@ -132,7 +133,10 @@ PENTING: [NEEDS_ADB_INFO] HANYA pakai kalau user nanya spesifik soal device, app
     // Save user message to history
     if (from) saveMessage(from, 'user', userMessage);
 
+    const startTime = Date.now();
     let aiResult = await chatCompletion(messages, getCurrentModel(), isComplex, from) || "";
+    const responseTimeMs = Date.now() - startTime;
+    if (from) trackAIResponse(from, responseTimeMs, getCurrentModel());
     
     // Handle dynamic ADB info request
     if (aiResult.includes("[NEEDS_ADB_INFO]")) {
