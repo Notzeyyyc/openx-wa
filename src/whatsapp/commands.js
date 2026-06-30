@@ -303,6 +303,8 @@ export async function handleCommands(from, textMessage, msg, waSock) {
                 `Welcome msg: ${group.welcome_message || '(default)'}`,
                 `Anti-spam: ${group.spam_protection ? '✅ ON' : '❌ OFF'}`,
                 `Auto-reply: ${group.auto_reply_enabled ? '✅ ON' : '❌ OFF'}`,
+                `AI Chat: ${group.ai_enabled ? '✅ ON' : '❌ OFF'}`,
+                `AI Keywords: ${(group.ai_keywords || ['bot', 'openx']).join(', ')}`,
                 `Muted: ${group.muted ? '🔇 YES' : '🔊 NO'}`
             ].join('\n');
             await waSock.sendMessage(from, { text: status }, { quoted: msg });
@@ -351,8 +353,39 @@ export async function handleCommands(from, textMessage, msg, waSock) {
         } else if (sub === 'unmute') {
             setGroup(from, { muted: false });
             await waSock.sendMessage(from, { text: "🔊 Bot unmuted." }, { quoted: msg });
+        } else if (sub === 'ai') {
+            const val = args[2]?.toLowerCase();
+            if (val === 'on') {
+                setGroup(from, { ai_enabled: true });
+                await waSock.sendMessage(from, { text: "✅ AI chat enabled in this group." }, { quoted: msg });
+            } else if (val === 'off') {
+                setGroup(from, { ai_enabled: false });
+                await waSock.sendMessage(from, { text: "❌ AI chat disabled in this group." }, { quoted: msg });
+            } else {
+                await waSock.sendMessage(from, { text: "❓ Usage: .group ai on/off" }, { quoted: msg });
+            }
+        } else if (sub === 'keyword') {
+            const action = args[2]?.toLowerCase();
+            const kw = args[3];
+            const currentKw = group.ai_keywords || ['bot', 'openx'];
+            if (action === 'add' && kw) {
+                if (!currentKw.includes(kw.toLowerCase())) {
+                    currentKw.push(kw.toLowerCase());
+                    setGroup(from, { ai_keywords: currentKw });
+                }
+                await waSock.sendMessage(from, { text: `✅ Keywords: ${currentKw.join(', ')}` }, { quoted: msg });
+            } else if (action === 'remove' && kw) {
+                const idx = currentKw.indexOf(kw.toLowerCase());
+                if (idx !== -1) currentKw.splice(idx, 1);
+                setGroup(from, { ai_keywords: currentKw });
+                await waSock.sendMessage(from, { text: `✅ Keywords: ${currentKw.join(', ')}` }, { quoted: msg });
+            } else if (action === 'list') {
+                await waSock.sendMessage(from, { text: `📋 Keywords: ${currentKw.join(', ')}` }, { quoted: msg });
+            } else {
+                await waSock.sendMessage(from, { text: "❓ Usage: .group keyword add/remove/list <keyword>" }, { quoted: msg });
+            }
         } else {
-            await waSock.sendMessage(from, { text: "❓ *Group Commands:*\n.group settings\n.group welcome on/off/<msg>\n.group spam on/off\n.group reply on/off\n.group mute/unmute" }, { quoted: msg });
+            await waSock.sendMessage(from, { text: "❓ *Group Commands:*\n.group settings\n.group welcome on/off/<msg>\n.group spam on/off\n.group reply on/off\n.group mute/unmute\n.group ai on/off\n.group keyword add/remove/list <kw>" }, { quoted: msg });
         }
         return true;
     }

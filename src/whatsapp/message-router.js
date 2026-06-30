@@ -107,6 +107,18 @@ export function setupMessageHandler(waSock) {
                         return;
                     }
                 }
+                // If AI not enabled in group, skip AI processing for non-prefix messages
+                if (!group?.ai_enabled && !lowerText.startsWith('.openx')) {
+                    // Allow commands but skip natural AI chat
+                    if (!lowerText.startsWith('.group') && !lowerText.startsWith('.plugin') &&
+                        !lowerText.startsWith('.play') && !lowerText.startsWith('.personality') &&
+                        !lowerText.startsWith('.model') && !lowerText.startsWith('.stats') &&
+                        !lowerText.startsWith('reset') && !lowerText.startsWith('clear') &&
+                        !lowerText.startsWith('ram') && !lowerText.startsWith('ping') &&
+                        !lowerText.startsWith('gc')) {
+                        return;
+                    }
+                }
             }
 
             if (textMessage) {
@@ -163,9 +175,31 @@ export function setupMessageHandler(waSock) {
                     isComplex = false;
                     aiPromptUser = textMessage.trim().substring(6).trim();
                 } else if (!isGroup) {
+                    // DM: respond naturally
                     aiPromptUser = textMessage.trim();
                     const complexHint = /(analis|analysis|debug|refactor|step by step|rinci|mendalam|kompleks|code|kode)/i;
                     isComplex = textMessage.length > 220 || complexHint.test(textMessage);
+                } else if (isGroup) {
+                    // Group: check mention or keyword trigger
+                    const group = getGroup(from);
+                    const botJid = waSock.user?.id?.replace(/:\d+/, '');
+                    const mentionedJids = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+                    const isMentioned = botJid && mentionedJids.includes(botJid);
+
+                    // Check keyword triggers
+                    const keywords = group?.ai_keywords || ['bot', 'openx'];
+                    const hasKeyword = keywords.some(kw => lowerText.includes(kw.toLowerCase()));
+
+                    if (isMentioned || hasKeyword) {
+                        // Strip mention from message
+                        aiPromptUser = textMessage.trim();
+                        if (botJid) {
+                            aiPromptUser = aiPromptUser.replace(new RegExp(`@\\d+`, 'g'), '').trim();
+                        }
+                        isComplex = textMessage.length > 220;
+                    } else {
+                        return; // Not mentioned and no keyword — skip
+                    }
                 } else {
                     return;
                 }
