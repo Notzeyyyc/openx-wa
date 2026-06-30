@@ -147,6 +147,9 @@ case "$1" in
         echo -e "Notification akan refresh tiap 5 menit"
         echo -e "Pastikan: Settings > Apps > Termux > Battery > Unrestricted"
         ;;
+    tailscale|ts)
+        bash "$INSTALL_DIR/scripts/tailscale-setup.sh"
+        ;;
     notify)
         termux-notification -i openxx -t "OpenXX Running" --priority low -c "Bot is active" --ongoing 2>/dev/null
         echo -e "${GREEN}✓ Notification sent${NC}"
