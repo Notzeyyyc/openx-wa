@@ -35,6 +35,16 @@ async function getProvider() {
             _provider = { complete: chatCompletion, name: "claude" };
             break;
         }
+        case "chatgpt": {
+            const { chatCompletion } = await import("./providers/chatgpt.js");
+            _provider = { complete: chatCompletion, name: "chatgpt" };
+            break;
+        }
+        case "gemini": {
+            const { chatCompletion } = await import("./providers/gemini.js");
+            _provider = { complete: chatCompletion, name: "gemini" };
+            break;
+        }
         case "openrouter":
         default: {
             const { chatCompletion } = await import("./providers/openrouter.js");

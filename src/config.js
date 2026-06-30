@@ -93,6 +93,20 @@ export const config = {
             webSearch: (process.env.OPENX_CLAUDE_WEB_SEARCH || "false") === "true",
             deepResearch: (process.env.OPENX_CLAUDE_DEEP_RESEARCH || "false") === "true",
         },
+        chatgpt: {
+            baseUrl: process.env.OPENX_CHATGPT_BASE_URL || "https://fgsi.dpdns.org/api/ai/chatgpt",
+            apiKey: process.env.OPENX_CHATGPT_API_KEY || "",
+            model: process.env.OPENX_CHATGPT_MODEL || "openai/gpt-4o",
+            webSearch: (process.env.OPENX_CHATGPT_WEB_SEARCH || "false") === "true",
+            deepResearch: (process.env.OPENX_CHATGPT_DEEP_RESEARCH || "false") === "true",
+        },
+        gemini: {
+            baseUrl: process.env.OPENX_GEMINI_BASE_URL || "https://fgsi.dpdns.org/api/ai/gemini",
+            apiKey: process.env.OPENX_GEMINI_API_KEY || "",
+            model: process.env.OPENX_GEMINI_MODEL || "google/gemini-2.5-flash",
+            webSearch: (process.env.OPENX_GEMINI_WEB_SEARCH || "false") === "true",
+            deepResearch: (process.env.OPENX_GEMINI_DEEP_RESEARCH || "false") === "true",
+        },
     },
     openrouter: {
         get apiKeys() { return splitCsv(process.env.OPENX_OPENROUTER_API_KEYS); },
