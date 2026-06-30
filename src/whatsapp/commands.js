@@ -8,7 +8,7 @@ import { cancelBgTask, getBgStatusText } from './queue.js';
 import { searchAndDownload } from './music-handler.js';
 import { clearHistory } from './conversation-store.js';
 import { getRamReport, getRamTrend, forceGarbageCollect } from './ram-monitor.js';
-import { getGroup, setGroup } from './group-manager.js';
+import { spawnAgent, listAgents, getAgentsStatus, AGENT_TYPES } from './agent-manager.js';
 import { log } from '../logger.js';
 import { getStatsSummary } from '../analytics.js';
 import { handlePluginCommand, reloadPlugins } from '../plugin-manager.mjs';
@@ -199,6 +199,33 @@ export async function handleCommands(from, textMessage, msg, waSock) {
     if (/^(ram|memory|mem|status ram)$/i.test(textMessage.trim())) {
         const report = getRamReport();
         await waSock.sendMessage(from, { text: report }, { quoted: msg });
+        return true;
+    }
+
+    // Agent Commands
+    if (/^\.agent\b/i.test(textMessage.trim())) {
+        const args = textMessage.trim().split(/\s+/);
+        const sub = args[1]?.toLowerCase();
+
+        if (sub === 'status' || sub === 'list') {
+            const status = getAgentsStatus();
+            await waSock.sendMessage(from, { text: `🤖 *Agents*\n\n${status}` }, { quoted: msg });
+            return true;
+        }
+
+        if (sub === 'research' || sub === 'code' || sub === 'translate' || sub === 'summary') {
+            const task = args.slice(2).join(' ').trim();
+            if (!task) {
+                await waSock.sendMessage(from, { text: `❓ Usage: .agent ${sub} <task>` }, { quoted: msg });
+                return true;
+            }
+            spawnAgent(sub, task, from, waSock);
+            return true;
+        }
+
+        await waSock.sendMessage(from, {
+            text: `❓ *Agent Commands:*\n.agent research <task>\n.agent code <task>\n.agent translate <task>\n.agent summary <task>\n.agent status`
+        }, { quoted: msg });
         return true;
     }
 
