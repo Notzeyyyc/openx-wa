@@ -3,6 +3,7 @@ mimocode.json
 caches/
 log.txt
 .env
+openxx.db
 package/wa_read_cache.json
 package/schedules.json
 package/storage/*
