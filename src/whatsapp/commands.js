@@ -9,7 +9,7 @@ import { searchAndDownload } from './music-handler.js';
 import { clearHistory } from './conversation-store.js';
 import { getRamReport, getRamTrend, forceGarbageCollect } from './ram-monitor.js';
 import { spawnAgent, listAgents, getAgentsStatus, AGENT_TYPES } from './agent-manager.js';
-import { getAIConfig, setMainProvider, setMainModel, setMainApiKey, setAgentConfig, getAIStatus } from '../ai-config.js';
+import { getAIConfig, setMainProvider, setMainModel, setMainApiKey, setAgentConfig, setAgentApiKey, getAIStatus } from '../ai-config.js';
 import { log } from '../logger.js';
 import { getStatsSummary } from '../analytics.js';
 import { handlePluginCommand, reloadPlugins } from '../plugin-manager.mjs';
@@ -260,8 +260,20 @@ export async function handleCommands(from, textMessage, msg, waSock) {
             return true;
         }
 
+        if (sub === 'agentkey') {
+            const agentType = args[2];
+            const apiKey = args.slice(3).join(' ').trim();
+            if (!agentType || !apiKey) {
+                await waSock.sendMessage(from, { text: "❓ Usage: .ai agentkey <agent-type> <api-key>\nTypes: research, code, translate, summary, homework, essay, solver, vision" }, { quoted: msg });
+                return true;
+            }
+            setAgentApiKey(agentType, apiKey);
+            await waSock.sendMessage(from, { text: `✅ Agent ${agentType} API Key set: ***${apiKey.slice(-4)}` }, { quoted: msg });
+            return true;
+        }
+
         await waSock.sendMessage(from, {
-            text: `❓ *AI Commands:*\n.ai status — lihat config\n.ai provider <name> — ganti provider\n.ai model <name> — ganti model\n.ai apikey <key> — set API key\n.ai agent <type> <provider> [model] — set agent`
+            text: `❓ *AI Commands:*\n.ai status — lihat config\n.ai provider <name> — ganti provider\n.ai model <name> — ganti model\n.ai apikey <key> — set API key\n.ai agentkey <type> <key> — set agent API key\n.ai agent <type> <provider> [model] — set agent`
         }, { quoted: msg });
         return true;
     }

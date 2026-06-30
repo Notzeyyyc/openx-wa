@@ -53,14 +53,15 @@ async function loadProvider(name) {
  * @param {string|null} model - model override
  * @param {boolean} isComplex - complex mode flag
  * @param {string|null} userJid - user JID for session tracking
- * @param {string|null} providerOverride - force specific provider (ignores config)
+ * @param {string|null} providerOverride - force specific provider
+ * @param {string|null} apiKeyOverride - force specific API key
  * @returns {Promise<string>}
  */
-export async function chatCompletion(messages, model = null, isComplex = false, userJid = null, providerOverride = null) {
+export async function chatCompletion(messages, model = null, isComplex = false, userJid = null, providerOverride = null, apiKeyOverride = null) {
     const providerName = providerOverride || config.ai?.provider || "openrouter";
 
-    // Inject API key from ai-config if not in env
-    const apiKey = getMainApiKey();
+    // Inject API key: override > ai-config > env
+    const apiKey = apiKeyOverride || getMainApiKey();
     if (apiKey && config.ai?.[providerName]) {
         config.ai[providerName].apiKey = apiKey;
     }

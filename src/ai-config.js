@@ -109,6 +109,21 @@ export function setAgentConfig(agentType, provider, model) {
     setAIConfig(cfg);
 }
 
+export function getAgentApiKey(agentType) {
+    const cfg = getAIConfig();
+    const agentConf = cfg.agents[agentType];
+    if (agentConf?.apiKey) return agentConf.apiKey;
+    // Fallback to main API key
+    return cfg.main.apiKey || '';
+}
+
+export function setAgentApiKey(agentType, apiKey) {
+    const cfg = getAIConfig();
+    if (!cfg.agents[agentType]) cfg.agents[agentType] = {};
+    cfg.agents[agentType].apiKey = apiKey;
+    setAIConfig(cfg);
+}
+
 export function getAIStatus() {
     const cfg = getAIConfig();
     const lines = [`🤖 *AI Configuration*\n`];
