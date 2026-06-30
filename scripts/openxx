@@ -34,8 +34,8 @@ show_menu() {
     echo -e "  ${CYAN}6${NC}) View MCP logs"
     echo -e "  ${YELLOW}7${NC}) Edit config (.env)"
     echo -e "  ${YELLOW}8${NC}) Update project (git pull)"
-    echo -e "  ${RED}9${NC}) Uninstall"
-    echo -e "  ${CYAN}0${NC}) Exit"
+    echo -e "  ${GREEN}9${NC}) Setup keep-alive (anti-kill)"
+    echo -e "  ${RED}0${NC}) Exit"
     echo ""
     echo -n "  Select: "
     read choice
@@ -49,7 +49,7 @@ show_menu() {
         6) pm2 logs openxx-mcp --lines 50 ;;
         7) nano "$INSTALL_DIR/.env" ;;
         8) update_project; press_enter ;;
-        9) uninstall ;;
+        9) bash "$INSTALL_DIR/scripts/termux-keepalive.sh"; press_enter ;;
         0) exit 0 ;;
         *) echo -e "${RED}Invalid option${NC}"; press_enter ;;
     esac
@@ -138,6 +138,19 @@ case "$1" in
     update)
         update_project
         ;;
+    keepalive|ka)
+        echo -e "${CYAN}Setting up keep-alive...${NC}"
+        pkg install -y termux-api 2>/dev/null
+        pkill -f keepalive-daemon 2>/dev/null
+        nohup bash -c 'while true; do termux-notification -i openxx -t "OpenXX Running" --priority low -c "Bot active | $(date +%H:%M)" --ongoing 2>/dev/null; sleep 300; done' > /dev/null 2>&1 &
+        echo -e "${GREEN}✓ Keep-alive started${NC}"
+        echo -e "Notification akan refresh tiap 5 menit"
+        echo -e "Pastikan: Settings > Apps > Termux > Battery > Unrestricted"
+        ;;
+    notify)
+        termux-notification -i openxx -t "OpenXX Running" --priority low -c "Bot is active" --ongoing 2>/dev/null
+        echo -e "${GREEN}✓ Notification sent${NC}"
+        ;;
     *)
         # Show interactive menu if no args
         if [ -z "$1" ]; then
@@ -145,7 +158,7 @@ case "$1" in
                 show_menu
             done
         else
-            echo "Usage: openxx [start|stop|restart|status|logs|logs-mcp|update]"
+            echo "Usage: openxx [start|stop|restart|status|logs|logs-mcp|update|keepalive|notify]"
         fi
         ;;
 esac
