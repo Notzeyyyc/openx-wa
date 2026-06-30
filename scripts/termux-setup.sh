@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/sh
-# OpenXX Termux Setup Script
-# Install + Run + Background (single command)
+# OpenXX Termux Installer v2
+# One-click setup: install + configure + start + daemon
 # Usage: curl -sL <url>/termux-setup.sh | sh
 
 set -e
@@ -14,124 +14,117 @@ NC='\033[0m'
 INSTALL_DIR="$HOME/openxx"
 MCP_DIR="$INSTALL_DIR/openx-mcp"
 
+echo ""
 echo -e "${CYAN}╔══════════════════════════════════════╗${NC}"
-echo -e "${CYAN}║       OpenXX Termux Setup            ║${NC}"
+echo -e "${CYAN}║      OpenXX Installer v2             ║${NC}"
 echo -e "${CYAN}╚══════════════════════════════════════╝${NC}"
 echo ""
 
-# ── Step 1: Install dependencies ──
-echo -e "${YELLOW}[1/6] Installing dependencies...${NC}"
+# ── Step 1: System deps ──
+echo -e "${YELLOW}[1/8] Installing system dependencies...${NC}"
 pkg update -y
-pkg install -y nodejs-lts golang git tmux curl
+pkg install -y nodejs-lts golang git tmux curl android-tools
 
-# Install pnpm
+# ── Step 2: pnpm ──
+echo -e "${YELLOW}[2/8] Installing pnpm...${NC}"
 if ! command -v pnpm &> /dev/null; then
     corepack enable
     corepack prepare pnpm@latest --activate
 fi
+echo -e "${GREEN}✓ pnpm ready${NC}"
 
-echo -e "${GREEN}✓ Dependencies installed${NC}"
+# ── Step 3: pm2 ──
+echo -e "${YELLOW}[3/8] Installing pm2 (process manager)...${NC}"
+npm install -g pm2
+echo -e "${GREEN}✓ pm2 ready${NC}"
 
-# ── Step 2: Clone or update project ──
-echo -e "${YELLOW}[2/6] Setting up project...${NC}"
+# ── Step 4: Clone project ──
+echo -e "${YELLOW}[4/8] Setting up project...${NC}"
 if [ -d "$INSTALL_DIR/.git" ]; then
     cd "$INSTALL_DIR"
     git pull
     echo -e "${GREEN}✓ Project updated${NC}"
 else
-    if [ -d "$INSTALL_DIR" ]; then
-        rm -rf "$INSTALL_DIR"
-    fi
-    # Clone from your repo
+    rm -rf "$INSTALL_DIR" 2>/dev/null
     git clone https://github.com/Notzeyyyc/openx-wa.git "$INSTALL_DIR"
     cd "$INSTALL_DIR"
     echo -e "${GREEN}✓ Project cloned${NC}"
 fi
 
-# ── Step 3: Install npm dependencies ──
-echo -e "${YELLOW}[3/6] Installing npm packages...${NC}"
+# ── Step 5: npm install ──
+echo -e "${YELLOW}[5/8] Installing npm packages...${NC}"
 pnpm install
 echo -e "${GREEN}✓ npm packages installed${NC}"
 
-# ── Step 4: Build MCP server ──
-echo -e "${YELLOW}[4/6] Building MCP server...${NC}"
+# ── Step 6: Build MCP server ──
+echo -e "${YELLOW}[6/8] Building MCP server...${NC}"
 if [ -d "$MCP_DIR" ]; then
     cd "$MCP_DIR"
-    go build -o openx-mcp . 2>/dev/null && echo -e "${GREEN}✓ MCP server built${NC}" || echo -e "${RED}⚠ MCP build skipped (Go error)${NC}"
+    go build -o openx-mcp . 2>/dev/null && echo -e "${GREEN}✓ MCP server built${NC}" || echo -e "${YELLOW}⚠ MCP build skipped${NC}"
     cd "$INSTALL_DIR"
 fi
 
-# ── Step 5: Create .env if not exists ──
-echo -e "${YELLOW}[5/6] Checking configuration...${NC}"
+# ── Step 7: Configure ──
+echo -e "${YELLOW}[7/8] Configuring...${NC}"
 if [ ! -f ".env" ]; then
     cp .env.example .env
-    echo -e "${YELLOW}⚠ Created .env from template — edit it with your values:${NC}"
+    echo -e "${YELLOW}⚠ Created .env — edit it:${NC}"
     echo -e "   ${CYAN}nano .env${NC}"
 else
     echo -e "${GREEN}✓ .env exists${NC}"
 fi
 
-# ── Step 6: Setup tmux + start ──
-echo -e "${YELLOW}[6/6] Starting services...${NC}"
+# ── Step 8: Install CLI + start services ──
+echo -e "${YELLOW}[8/8] Installing CLI + starting services...${NC}"
 
-# Kill existing sessions
-tmux kill-session -t openxx 2>/dev/null || true
-tmux kill-session -t openxx-mcp 2>/dev/null || true
+# Install openxx CLI
+cp "$INSTALL_DIR/scripts/openxx" "$PREFIX/bin/openxx"
+chmod +x "$PREFIX/bin/openxx"
 
-# Start bot in tmux (memory-optimized)
-tmux new-session -d -s openxx "cd $INSTALL_DIR && node --max-old-space-size=128 --gc-interval=100 --expose-gc index.js"
-echo -e "${GREEN}✓ Bot started in tmux session 'openxx'${NC}"
+# Stop existing pm2 processes
+pm2 delete openxx-bot 2>/dev/null || true
+pm2 delete openxx-mcp 2>/dev/null || true
 
-# Start MCP server in tmux
+# Start bot with pm2
+cd "$INSTALL_DIR"
+pm2 start index.js --name openxx-bot --node-args="--max-old-space-size=128 --gc-interval=100 --expose-gc"
+echo -e "${GREEN}✓ Bot started with pm2${NC}"
+
+# Start MCP server with pm2
 if [ -f "$MCP_DIR/openx-mcp" ]; then
-    tmux new-session -d -s openxx-mcp "cd $MCP_DIR && ./openx-mcp"
-    echo -e "${GREEN}✓ MCP server started in tmux session 'openxx-mcp'${NC}"
+    pm2 start "$MCP_DIR/openx-mcp" --name openxx-mcp --cwd "$MCP_DIR"
+    echo -e "${GREEN}✓ MCP server started with pm2${NC}"
 fi
 
-# ── Setup Termux:Boot (auto-start on boot) ──
+# Save pm2 config & setup auto-start
+pm2 save
+pm2 startup 2>/dev/null || true
+
+# ── Setup Termux:Boot ──
 BOOT_DIR="$HOME/.termux/boot"
 mkdir -p "$BOOT_DIR"
 cat > "$BOOT_DIR/openxx.sh" << 'BOOTEOF'
 #!/data/data/com.termux/files/usr/bin/sh
 termux-wake-lock
-sleep 5
-
-# Start bot (memory-optimized)
-tmux new-session -d -s openxx "cd ~/openxx && node --max-old-space-size=128 --gc-interval=100 --expose-gc index.js"
-
-# Start MCP server
-if [ -f ~/openxx/openx-mcp/openx-mcp ]; then
-    tmux new-session -d -s openxx-mcp "cd ~/openxx/openx-mcp && ./openx-mcp"
-fi
+sleep 3
+pm2 resurrect
 BOOTEOF
 chmod +x "$BOOT_DIR/openxx.sh"
 echo -e "${GREEN}✓ Auto-start configured (Termux:Boot)${NC}"
 
-# ── Keep device awake ──
+# ── Keep awake ──
 termux-wake-lock 2>/dev/null
-
-# ── Install openxx shortcut ──
-cp "$INSTALL_DIR/scripts/openxx" "$PREFIX/bin/openxx"
-chmod +x "$PREFIX/bin/openxx"
-echo -e "${GREEN}✓ Installed 'openxx' command${NC}"
 
 # ── Done ──
 echo ""
 echo -e "${CYAN}╔══════════════════════════════════════╗${NC}"
-echo -e "${CYAN}║          Setup Complete!             ║${NC}"
+echo -e "${CYAN}║         Setup Complete!              ║${NC}"
 echo -e "${CYAN}╚══════════════════════════════════════╝${NC}"
 echo ""
 echo -e "Quick commands:"
-echo -e "  ${CYAN}openxx${NC}            — Start bot + MCP"
-echo -e "  ${CYAN}openxx stop${NC}       — Stop all"
-echo -e "  ${CYAN}openxx restart${NC}    — Restart all"
+echo -e "  ${CYAN}openxx${NC}            — Open start menu"
 echo -e "  ${CYAN}openxx status${NC}     — Check status"
 echo -e "  ${CYAN}openxx logs${NC}       — View bot logs"
-echo -e "  ${CYAN}openxx logs-mcp${NC}   — View MCP logs"
-echo ""
-echo -e "Other:"
 echo -e "  ${CYAN}nano .env${NC}         — Edit config"
-echo -e "  ${CYAN}tmux ls${NC}           — List sessions"
 echo ""
-echo -e "Sessions:"
-tmux ls 2>/dev/null || echo "  (no sessions)"
+pm2 status
