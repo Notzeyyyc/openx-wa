@@ -2,6 +2,7 @@ import { config, loadJsonConfig } from "./src/config.js";
 import fs from "fs";
 import { log, error as logError } from "./src/logger.js";
 import { connectToWhatsApp, waSock } from "./src/whatsapp/connection.js";
+import { initDB } from "./src/database.js";
 import cron from "node-cron";
 import { exec } from 'child_process';
 import util from 'util';
@@ -99,6 +100,8 @@ async function connectADB() {
 
 async function start() {
     log("Starting OPENX Bot (WhatsApp Focus)...");
+    await initDB();
+    log("Database initialized");
     await connectADB();
     connectToWhatsApp();
 }
