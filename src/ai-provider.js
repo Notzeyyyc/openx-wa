@@ -1,73 +1,62 @@
 import { config } from "./config.js";
 
-/**
- * AI Provider Abstraction Layer
- *
- * Routes chatCompletion() calls to the configured provider:
- *   - "openrouter" → OpenRouter (multi-model, key rotation, fallback)
- *   - "rest"       → Custom REST API (stateless or session-based)
- *
- * Usage:
- *   import { chatCompletion } from './package/openx/ai-provider.js';
- *   const reply = await chatCompletion(messages, model, isComplex, userJid);
- */
+// Provider cache: name -> { complete, name }
+const providerCache = new Map();
 
-let _provider = null;
+async function loadProvider(name) {
+    if (providerCache.has(name)) return providerCache.get(name);
 
-async function getProvider() {
-    if (_provider) return _provider;
-
-    const providerName = config.ai?.provider || "openrouter";
-
-    switch (providerName) {
+    let provider;
+    switch (name) {
         case "rest": {
             const { chatCompletion } = await import("./providers/rest.js");
-            _provider = { complete: chatCompletion, name: "rest" };
+            provider = { complete: chatCompletion, name: "rest" };
             break;
         }
         case "openai": {
             const { chatCompletion } = await import("./providers/openai.js");
-            _provider = { complete: chatCompletion, name: "openai" };
+            provider = { complete: chatCompletion, name: "openai" };
             break;
         }
         case "claude": {
             const { chatCompletion } = await import("./providers/claude.js");
-            _provider = { complete: chatCompletion, name: "claude" };
+            provider = { complete: chatCompletion, name: "claude" };
             break;
         }
         case "chatgpt": {
             const { chatCompletion } = await import("./providers/chatgpt.js");
-            _provider = { complete: chatCompletion, name: "chatgpt" };
+            provider = { complete: chatCompletion, name: "chatgpt" };
             break;
         }
         case "gemini": {
             const { chatCompletion } = await import("./providers/gemini.js");
-            _provider = { complete: chatCompletion, name: "gemini" };
+            provider = { complete: chatCompletion, name: "gemini" };
             break;
         }
         case "openrouter":
         default: {
             const { chatCompletion } = await import("./providers/openrouter.js");
-            _provider = { complete: chatCompletion, name: "openrouter" };
+            provider = { complete: chatCompletion, name: "openrouter" };
             break;
         }
     }
 
-    console.log(`[AI Provider] Using: ${_provider.name}`);
-    return _provider;
+    providerCache.set(name, provider);
+    return provider;
 }
 
 /**
- * Send messages to the configured AI provider and return the completion.
+ * Send messages to AI provider.
  *
  * @param {Array<{role: string, content: string}>} messages
  * @param {string|null} model - model override
- * @param {boolean} isComplex - complex mode flag (OpenRouter only)
- * @param {string|null} userJid - user JID for session tracking (REST only)
+ * @param {boolean} isComplex - complex mode flag
+ * @param {string|null} userJid - user JID for session tracking
+ * @param {string|null} providerOverride - force specific provider (ignores config)
  * @returns {Promise<string>}
  */
-export async function chatCompletion(messages, model = null, isComplex = false, userJid = null) {
-    const provider = await getProvider();
-    // REST provider accepts userJid as 4th arg, OpenRouter ignores it
+export async function chatCompletion(messages, model = null, isComplex = false, userJid = null, providerOverride = null) {
+    const providerName = providerOverride || config.ai?.provider || "openrouter";
+    const provider = await loadProvider(providerName);
     return provider.complete(messages, model, isComplex, userJid);
 }

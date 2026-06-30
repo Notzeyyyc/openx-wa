@@ -1,4 +1,5 @@
 import { chatCompletion } from '../ai-provider.js';
+import { getAgentProvider, getAgentModel } from '../ai-config.js';
 import { log as logFn, error as logError } from '../logger.js';
 
 // Active agents
@@ -130,9 +131,13 @@ async function runAgent(agent, agentType, waSock) {
             { role: 'user', content: agent.task }
         ];
 
-        logFn(`[${agent.name}] Running: ${agent.task.slice(0, 50)}...`);
+        // Get agent-specific provider/model from config
+        const provider = getAgentProvider(agent.type);
+        const model = getAgentModel(agent.type);
 
-        const result = await chatCompletion(messages, null, true);
+        logFn(`[${agent.name}] Running with ${provider}${model ? '/' + model : ''}: ${agent.task.slice(0, 50)}...`);
+
+        const result = await chatCompletion(messages, model || null, true, null, provider);
         agent.result = result;
         agent.status = 'completed';
         agent.finishedAt = Date.now();

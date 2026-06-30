@@ -9,6 +9,7 @@ import { searchAndDownload } from './music-handler.js';
 import { clearHistory } from './conversation-store.js';
 import { getRamReport, getRamTrend, forceGarbageCollect } from './ram-monitor.js';
 import { spawnAgent, listAgents, getAgentsStatus, AGENT_TYPES } from './agent-manager.js';
+import { getAIConfig, setMainProvider, setMainModel, setAgentConfig, getAIStatus } from '../ai-config.js';
 import { log } from '../logger.js';
 import { getStatsSummary } from '../analytics.js';
 import { handlePluginCommand, reloadPlugins } from '../plugin-manager.mjs';
@@ -199,6 +200,58 @@ export async function handleCommands(from, textMessage, msg, waSock) {
     if (/^(ram|memory|mem|status ram)$/i.test(textMessage.trim())) {
         const report = getRamReport();
         await waSock.sendMessage(from, { text: report }, { quoted: msg });
+        return true;
+    }
+
+    // AI Config Commands
+    if (/^\.ai\b/i.test(textMessage.trim())) {
+        const args = textMessage.trim().split(/\s+/);
+        const sub = args[1]?.toLowerCase();
+
+        if (sub === 'status' || sub === 'list') {
+            const status = getAIStatus();
+            await waSock.sendMessage(from, { text: status }, { quoted: msg });
+            return true;
+        }
+
+        if (sub === 'provider') {
+            const provider = args[2];
+            if (!provider) {
+                await waSock.sendMessage(from, { text: "❓ Usage: .ai provider <name>\nProviders: openrouter, openai, claude, chatgpt, gemini, rest" }, { quoted: msg });
+                return true;
+            }
+            setMainProvider(provider);
+            await waSock.sendMessage(from, { text: `✅ Main AI provider set to: ${provider}` }, { quoted: msg });
+            return true;
+        }
+
+        if (sub === 'model') {
+            const model = args.slice(2).join(' ');
+            if (!model) {
+                await waSock.sendMessage(from, { text: "❓ Usage: .ai model <model-name>" }, { quoted: msg });
+                return true;
+            }
+            setMainModel(model);
+            await waSock.sendMessage(from, { text: `✅ Main AI model set to: ${model}` }, { quoted: msg });
+            return true;
+        }
+
+        if (sub === 'agent') {
+            const agentType = args[2];
+            const provider = args[3];
+            const model = args.slice(4).join(' ');
+            if (!agentType || !provider) {
+                await waSock.sendMessage(from, { text: "❓ Usage: .ai agent <type> <provider> [model]\nTypes: research, code, translate, summary, homework, essay, solver, vision" }, { quoted: msg });
+                return true;
+            }
+            setAgentConfig(agentType, provider, model || undefined);
+            await waSock.sendMessage(from, { text: `✅ Agent ${agentType} → ${provider}${model ? '/' + model : ''}` }, { quoted: msg });
+            return true;
+        }
+
+        await waSock.sendMessage(from, {
+            text: `❓ *AI Commands:*\n.ai status — lihat config\n.ai provider <name> — ganti provider utama\n.ai model <name> — ganti model utama\n.ai agent <type> <provider> [model] — set provider agent`
+        }, { quoted: msg });
         return true;
     }
 
