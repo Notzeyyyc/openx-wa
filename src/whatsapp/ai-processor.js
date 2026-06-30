@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { chatCompletion } from '../ai-provider.js';
 import { loadJsonConfig } from '../config.js';
+import { getMainProvider, getMainModel } from '../ai-config.js';
 import { handleMcpTags } from './mcp-client.js';
 import { error as logError } from '../logger.js';
 import { loadHistory, saveMessage, getRecentMessages } from './conversation-store.js';
@@ -134,9 +135,11 @@ PENTING: [NEEDS_ADB_INFO] HANYA pakai kalau user nanya spesifik soal device, app
     if (from) saveMessage(from, 'user', userMessage);
 
     const startTime = Date.now();
-    let aiResult = await chatCompletion(messages, getCurrentModel(), isComplex, from) || "";
+    const provider = getMainProvider();
+    const model = getMainModel() || getCurrentModel();
+    let aiResult = await chatCompletion(messages, model, isComplex, from, provider) || "";
     const responseTimeMs = Date.now() - startTime;
-    if (from) trackAIResponse(from, responseTimeMs, getCurrentModel());
+    if (from) trackAIResponse(from, responseTimeMs, model);
     
     // Handle dynamic ADB info request
     if (aiResult.includes("[NEEDS_ADB_INFO]")) {
