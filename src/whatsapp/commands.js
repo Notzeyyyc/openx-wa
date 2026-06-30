@@ -213,7 +213,7 @@ export async function handleCommands(from, textMessage, msg, waSock) {
             return true;
         }
 
-        if (sub === 'research' || sub === 'code' || sub === 'translate' || sub === 'summary') {
+        if (['research', 'code', 'translate', 'summary', 'homework', 'essay', 'solver'].includes(sub)) {
             const task = args.slice(2).join(' ').trim();
             if (!task) {
                 await waSock.sendMessage(from, { text: `❓ Usage: .agent ${sub} <task>` }, { quoted: msg });
@@ -224,7 +224,7 @@ export async function handleCommands(from, textMessage, msg, waSock) {
         }
 
         await waSock.sendMessage(from, {
-            text: `❓ *Agent Commands:*\n.agent research <task>\n.agent code <task>\n.agent translate <task>\n.agent summary <task>\n.agent status`
+            text: `❓ *Agent Commands:*\n.agent research <task> — riset\n.agent code <task> — coding\n.agent translate <task> — terjemah\n.agent summary <task> — rangkum\n.agent homework <task> — tugas sekolah\n.agent essay <task> — karangan\n.agent solver <task> — soal mat/fisika\n.agent status`
         }, { quoted: msg });
         return true;
     }
