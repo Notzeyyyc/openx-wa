@@ -13,6 +13,8 @@ import { getAIConfig, setMainProvider, setMainModel, setMainApiKey, setAgentConf
 import { log } from '../logger.js';
 import { getStatsSummary } from '../analytics.js';
 import { handlePluginCommand, reloadPlugins } from '../plugin-manager.mjs';
+import { addNote, listNotes, deleteNote, searchNotes } from './notes.js';
+import { setReminder, listReminders, cancelReminder } from './reminders.js';
 
 const SENSITIVE_TTL_MS = 2 * 60 * 1000;
 
@@ -361,6 +363,93 @@ export async function handleCommands(from, textMessage, msg, waSock) {
                 ? stats.topCommands.map(([cmd, count]) => `${cmd}: ${count}`).join('\n')
                 : 'No commands used today');
         await waSock.sendMessage(from, { text: msg_text }, { quoted: msg });
+        return true;
+    }
+
+    // Notes Commands
+    if (lowerText.startsWith('.note')) {
+        const args = textMessage.trim().split(/\s+/);
+        const sub = args[1]?.toLowerCase();
+
+        if (sub === 'add') {
+            const text = args.slice(2).join(' ').trim();
+            if (!text) {
+                await waSock.sendMessage(from, { text: "❓ Usage: .note add <text>" }, { quoted: msg });
+                return true;
+            }
+            const note = addNote(from, text);
+            await waSock.sendMessage(from, { text: `✅ Note saved (ID: ${note.id})` }, { quoted: msg });
+        } else if (sub === 'list') {
+            const notes = listNotes(from);
+            if (notes.length === 0) {
+                await waSock.sendMessage(from, { text: "📝 Belum ada catatan." }, { quoted: msg });
+            } else {
+                const lines = notes.map((n, i) => `${i + 1}. [${n.id}] ${n.text}`);
+                await waSock.sendMessage(from, { text: `📝 *Notes*\n\n${lines.join('\n')}` }, { quoted: msg });
+            }
+        } else if (sub === 'search') {
+            const query = args.slice(2).join(' ').trim();
+            if (!query) {
+                await waSock.sendMessage(from, { text: "❓ Usage: .note search <query>" }, { quoted: msg });
+                return true;
+            }
+            const notes = searchNotes(from, query);
+            if (notes.length === 0) {
+                await waSock.sendMessage(from, { text: `🔍 Tidak ada catatan cocok "${query}".` }, { quoted: msg });
+            } else {
+                const lines = notes.map((n, i) => `${i + 1}. [${n.id}] ${n.text}`);
+                await waSock.sendMessage(from, { text: `🔍 *Search: ${query}*\n\n${lines.join('\n')}` }, { quoted: msg });
+            }
+        } else if (sub === 'delete') {
+            const noteId = args[2];
+            if (!noteId) {
+                await waSock.sendMessage(from, { text: "❓ Usage: .note delete <id>" }, { quoted: msg });
+                return true;
+            }
+            const ok = deleteNote(from, noteId);
+            await waSock.sendMessage(from, { text: ok ? `🗑️ Note ${noteId} deleted.` : `❌ Note ${noteId} not found.` }, { quoted: msg });
+        } else {
+            await waSock.sendMessage(from, { text: "❓ *Note Commands:*\n.note add <text>\n.note list\n.note search <query>\n.note delete <id>" }, { quoted: msg });
+        }
+        return true;
+    }
+
+    // Reminder Commands
+    if (lowerText.startsWith('.reminder')) {
+        const args = textMessage.trim().split(/\s+/);
+        const sub = args[1]?.toLowerCase();
+
+        if (sub === 'list') {
+            const reminders = listReminders(from);
+            if (reminders.length === 0) {
+                await waSock.sendMessage(from, { text: "⏰ Belum ada reminder aktif." }, { quoted: msg });
+            } else {
+                const lines = reminders.map(r => `[${r.id}] ${r.time} - ${r.text}`);
+                await waSock.sendMessage(from, { text: `⏰ *Active Reminders*\n\n${lines.join('\n')}` }, { quoted: msg });
+            }
+        } else if (sub === 'cancel') {
+            const id = args[2];
+            if (!id) {
+                await waSock.sendMessage(from, { text: "❓ Usage: .reminder cancel <id>" }, { quoted: msg });
+                return true;
+            }
+            const ok = cancelReminder(from, id);
+            await waSock.sendMessage(from, { text: ok ? `🗑️ Reminder ${id} cancelled.` : `❌ Reminder ${id} not found.` }, { quoted: msg });
+        } else {
+            // Set reminder: .reminder <HH:MM> <text>
+            const timeStr = sub;
+            const text = args.slice(2).join(' ').trim();
+            if (!timeStr || !text) {
+                await waSock.sendMessage(from, { text: "❓ Usage: .reminder <HH:MM> <text>" }, { quoted: msg });
+                return true;
+            }
+            if (!/^\d{2}:\d{2}$/.test(timeStr)) {
+                await waSock.sendMessage(from, { text: "❌ Format waktu harus HH:MM (contoh: 14:30)" }, { quoted: msg });
+                return true;
+            }
+            const reminder = setReminder(from, timeStr, text);
+            await waSock.sendMessage(from, { text: `⏰ Reminder set: ${timeStr}\n\n${text}\n\n(ID: ${reminder.id})` }, { quoted: msg });
+        }
         return true;
     }
 

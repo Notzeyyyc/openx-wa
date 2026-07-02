@@ -8,6 +8,7 @@ import { initPluginManager } from '../plugin-manager.mjs';
 import { askAI } from './ai-processor.js';
 import { stripMarkdown } from './helpers.js';
 import { setupMessageHandler } from './message-router.js';
+import { startReminderChecker } from './reminders.js';
 
 let autoPostInterval = null;
 
@@ -57,6 +58,9 @@ export async function connectToWhatsApp() {
                 try { waSock.sendMessage(adminJid, { text: String(text) }); } catch {}
             };
             initPluginManager({ notify, sendMessageFn: (jid, msg) => waSock.sendMessage(jid, msg) }).catch(() => {});
+
+            // Start reminder checker
+            startReminderChecker(waSock);
             
             // Interval Auto-Post ke Admin Channels (1 jam)
             if (autoPostInterval) clearInterval(autoPostInterval);
