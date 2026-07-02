@@ -1,4 +1,6 @@
 node_modules/
+.mimocode/*
+docs/*
 mimocode.json
 caches/
 log.txt
@@ -10,10 +12,4 @@ package/storage/*
 !package/storage/.gitkeep
 package/conversations/
 
-# Build artifacts
-openx-mcp/*.exe
-openx-mcp/*-termux
-openx-mcp/*.tar.gz
 
-# Leftover old source (if any remains)
-package/openx/

@@ -112,10 +112,6 @@ export const config = {
         get apiKeys() { return splitCsv(process.env.OPENX_OPENROUTER_API_KEYS); },
     },
 
-    mcp: {
-        baseUrl: process.env.OPENX_MCP_URL || "http://localhost:8765",
-        apiKey: process.env.OPENX_MCP_API_KEY || "",
-    },
     plugins: {
         npm: splitCsv(process.env.OPENX_PLUGINS_NPM),
         allowUnpinned: (process.env.OPENX_ALLOW_UNPINNED_PLUGINS || "").toLowerCase() === "true",

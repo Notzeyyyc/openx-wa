@@ -3,7 +3,6 @@ import path from 'path';
 import { chatCompletion } from '../ai-provider.js';
 import { loadJsonConfig } from '../config.js';
 import { getMainProvider, getMainModel } from '../ai-config.js';
-import { handleMcpTags } from './mcp-client.js';
 import { error as logError } from '../logger.js';
 import { loadHistory, saveMessage, getRecentMessages } from './conversation-store.js';
 
@@ -97,8 +96,6 @@ export async function askAI(userMessage, from = null, isComplex = false) {
 Tag perintah (taruh di akhir reply, tersembunyi):
 [ADD_SCHEDULE|Hari|HH:MM|Desc|Target] | [WA_SEND|jid|pesan]
 [SERVER_GET_LOG] | [SERVER_RESTART] | [DOWNLOAD_MEDIA|url]
-[MCP_SEARCH|query] | [MCP_FILE_READ|path] | [MCP_FILE_WRITE|path|isi]
-[MCP_CRON|id|schedule|cmd] | [MCP_NOTIFY|title|content] | [MCP_DEVICE] | [MCP_BATTERY] | [MCP_NETWORK]
 Sebelum aksi sensitif, kasih [PRE_NOTIFY|pesan] dulu. Use 'none' jika Target WA tidak diketahui.`;
 
     // Load personality settings
@@ -230,10 +227,6 @@ Sebelum aksi sensitif, kasih [PRE_NOTIFY|pesan] dulu. Use 'none' jika Target WA 
         }).catch(err => logError(`Download failed for ${url}:`, err));
     }
     aiResult = aiResult.replace(dlRegex, '');
-
-    // ── MCP Tag Handlers ──────────────────────────────────────────────
-    aiResult = await handleMcpTags(aiResult, from, waSock);
-    // ── End MCP Tags ──────────────────────────────────────────────────
 
     // Save AI response to history
     if (from && aiResult) saveMessage(from, 'assistant', aiResult);

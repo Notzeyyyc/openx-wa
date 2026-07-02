@@ -6,7 +6,6 @@
   "scripts": {
     "start": "node index.js",
     "setup": "node setup/index.js",
-    "setup:mcp": "node scripts/setup-mcp-auth.mjs",
     "scan:secrets": "node scripts/scan-secrets.mjs",
     "test": "pnpm run scan:secrets"
   },
