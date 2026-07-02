@@ -1,7 +1,7 @@
 {
   "name": "openxx",
   "version": "1.0.0",
-  "description": "",
+  "description": "WhatsApp AI productivity assistant",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",

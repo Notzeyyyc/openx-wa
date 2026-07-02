@@ -1,125 +1,64 @@
 # OpenXX
 
-WhatsApp AI bot that actually does stuff — talks to your phone via ADB, runs AI models, plays music, and more. Built to run on a VPS or straight on your Android via Termux.
+WhatsApp AI productivity assistant. Belajar, kerja, dan produktivitas — semua dari WhatsApp.
 
 ## Features
 
-- **WhatsApp Bot** — AI-powered chat with multiple personalities
-- **ADB Control** — Take screenshots, tap, swipe, open apps on your phone
-- **Music Player** — `.play <song name>` and get the audio
-- **AI Providers** — OpenRouter, OpenAI-compatible (SumoPod), Claude, custom REST
-- **MCP Server** — 11 plugins (shell, file, device, browser, memory, cron, etc.)
-- **Conversation Memory** — AI remembers your previous messages
-- **RAM Monitor** — Check memory usage from WhatsApp
-- **Plugin System** — Extend with custom plugins (sandboxed)
+- **AI Chat** — Multi-provider (OpenAI, Claude, ChatGPT, Gemini, OpenRouter)
+- **Agents** — Homework, Essay, Solver, Research, Translate, Vision
+- **Notes** — Simpan catatan via WhatsApp
+- **Reminders** — Set pengingat via WhatsApp
+- **Music Player** — `.play <lagu>`
+- **Group Management** — Auto-welcome, anti-spam, auto-reply
+- **Analytics** — Track usage statistics
+- **Conversation Memory** — AI ingat percakapan sebelumnya
 
 ## Quick Start
 
 ### On Termux (Android)
-
-One-liner install:
-
 ```bash
 pkg install curl -y && curl -sL https://raw.githubusercontent.com/Notzeyyyc/openx-wa/main/scripts/termux-setup.sh | sh
 ```
 
-This installs everything, builds the MCP server, and starts the bot in the background.
-
-After install, use the `openxx` command:
-
+### On VPS
 ```bash
-openxx           # Start bot + MCP
-openxx stop      # Stop everything
-openxx restart   # Restart everything
-openxx status    # Check if it's running
-openxx logs      # View bot logs
-openxx logs-mcp  # View MCP server logs
+curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+sudo apt install -y nodejs git
+sudo npm install -g pnpm pm2
+git clone https://github.com/Notzeyyyc/openx-wa.git ~/openxx
+cd ~/openxx && pnpm install
+pm2 start index.js --name openxx-bot
+pm2 save && pm2 startup
 ```
 
-### On VPS / PC
-
-```bash
-# Clone the repo
-git clone https://github.com/Notzeyyyc/openx-wa.git
-cd openx-wa
-
-# Install dependencies
-pnpm install
-
-# Setup config
-cp .env.example .env
-nano .env  # fill in your values
-
-# Start
-pnpm start
-```
-
-## Configuration
-
-Copy `.env.example` to `.env` and fill in:
-
-```env
-# WhatsApp admin number (no + sign)
-OPENX_DEV_PHONE_NUMBER=628123456789
-
-# AI Provider: openrouter | openai | claude | rest
-OPENX_AI_PROVIDER=openai
-
-# OpenAI-compatible (SumoPod, Together, Groq, etc.)
-OPENX_OPENAI_BASE_URL=https://ai.sumopod.com
-OPENX_OPENAI_API_KEY=your-key
-OPENX_OPENAI_MODEL=gpt-4o-mini
-
-# Claude API (FongsiDev)
-OPENX_CLAUDE_BASE_URL=https://fgsi.dpdns.org/api/ai/claude
-OPENX_CLAUDE_API_KEY=your-key
-
-# ADB mode: auto | usb | or port number
-OPENX_ADB_PORT=usb
-
-# MCP Server URL
-OPENX_MCP_URL=http://localhost:8765
-OPENX_MCP_API_KEY=your-token
-```
-
-## WhatsApp Commands
+## Commands
 
 | Command | Description |
 |---------|-------------|
-| `.play <song>` | Play a song |
-| `.personality list` | List available personalities |
-| `.personality select <key>` | Switch personality |
-| `.model list` | List AI models |
-| `.model select <name>` | Switch model |
-| `ram` | Show RAM usage |
-| `gc` | Force garbage collect |
-| `reset` | Clear conversation memory |
-| `ping` | Pong! |
+| `.play <lagu>` | Play music |
+| `.note add <text>` | Save note |
+| `.note list` | List notes |
+| `.reminder <HH:MM> <text>` | Set reminder |
+| `.agent homework <task>` | Homework help |
+| `.agent essay <task>` | Essay writing |
+| `.agent solver <task>` | Math/science solver |
+| `.ai provider <name>` | Change AI provider |
+| `.ai apikey <key>` | Set API key |
+| `.ai status` | Check config |
+| `.stats` | View statistics |
+| `ram` | RAM usage |
+| `reset` | Clear memory |
 
-Just send any message without a prefix and the AI will reply naturally.
+## Configuration
 
-## USB ADB Setup
-
-1. Connect phone to laptop via USB
-2. Enable USB Debugging (Settings > Developer Options)
-3. Accept the RSA key prompt on your phone
-4. Set `OPENX_ADB_PORT=usb` in `.env`
-5. Run `adb devices` to verify
-
-## MCP Server
-
-The MCP server runs separately and provides tools like shell execution, file ops, device control, browser, memory, and more.
-
-```bash
-# Build
-cd openx-mcp
-go build -o openx-mcp .
-
-# Run
-./openx-mcp
+All settings via WhatsApp:
 ```
-
-Config: `openx-mcp/config.yaml`
+.ai phone <number>     — set admin number
+.ai provider <name>    — openai, claude, chatgpt, gemini, openrouter
+.ai apikey <key>       — set API key
+.ai model <name>       — set model
+.ai status             — check config
+```
 
 ## Project Structure
 
@@ -127,34 +66,31 @@ Config: `openx-mcp/config.yaml`
 openxx/
 ├── index.js              # Entry point
 ├── src/
-│   ├── config.js         # Configuration + env loader
-│   ├── logger.js         # Logging
+│   ├── config.js         # Configuration
 │   ├── ai-provider.js    # AI provider router
-│   ├── adb-connect.js    # ADB port detection
-│   ├── adb-helper.js     # ADB commands
-│   ├── downloader.js     # Media downloader
-│   ├── plugin-manager.mjs
-│   ├── providers/
-│   │   ├── openai.js     # OpenAI-compatible
-│   │   ├── openrouter.js # OpenRouter
-│   │   ├── claude.js     # Claude API
-│   │   └── rest.js       # Custom REST
+│   ├── ai-config.js      # Flexible AI config
+│   ├── database.js       # SQLite database
+│   ├── analytics.js      # Usage tracking
+│   ├── providers/        # AI providers
+│   │   ├── openai.js
+│   │   ├── claude.js
+│   │   ├── chatgpt.js
+│   │   ├── gemini.js
+│   │   └── openrouter.js
 │   └── whatsapp/
 │       ├── connection.js      # WhatsApp socket
 │       ├── message-router.js  # Message routing
-│       ├── ai-processor.js    # AI processing + tags
+│       ├── ai-processor.js    # AI processing
 │       ├── commands.js        # Command handlers
-│       ├── helpers.js         # Utilities
-│       ├── mcp-client.js      # MCP integration
+│       ├── agent-manager.js   # Subagent system
+│       ├── notes.js           # Notes feature
+│       ├── reminders.js       # Reminders feature
 │       ├── music-handler.js   # Music player
-│       ├── conversation-store.js # Chat memory
-│       ├── ram-monitor.js     # RAM monitoring
+│       ├── helpers.js         # Utilities
 │       ├── queue.js           # Message queue
-│       └── sensitive-actions.js # Confirmation flow
+│       └── conversation-store.js
 ├── setup/                # CLI setup tool
-├── scripts/              # Setup scripts
-├── openx-mcp/            # MCP server (Go)
-└── package/              # User configs
+└── scripts/              # Setup scripts
 ```
 
 ## License
