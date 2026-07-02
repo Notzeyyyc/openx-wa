@@ -13,6 +13,7 @@ import { getAIConfig, setMainProvider, setMainModel, setMainApiKey, setAgentConf
 import { log } from '../logger.js';
 import { getStatsSummary } from '../analytics.js';
 import { handlePluginCommand, reloadPlugins } from '../plugin-manager.mjs';
+import { sendButtons, sendList, sendPoll } from './interactive.js';
 import { addNote, listNotes, deleteNote, searchNotes } from './notes.js';
 import { setReminder, listReminders, cancelReminder } from './reminders.js';
 
@@ -212,16 +213,36 @@ export async function handleCommands(from, textMessage, msg, waSock) {
 
         if (sub === 'status' || sub === 'list') {
             const status = getAIStatus();
-            await waSock.sendMessage(from, { text: status }, { quoted: msg });
+            await sendButtons(waSock, from, status, [
+                { id: 'provider-openai', text: '🌐 OpenAI' },
+                { id: 'provider-claude', text: '🧠 Claude' },
+                { id: 'provider-chatgpt', text: '💬 ChatGPT' },
+                { id: 'provider-gemini', text: '✨ Gemini' }
+            ], { footer: 'Tap to switch provider' });
             return true;
         }
 
         if (sub === 'provider') {
             const provider = args[2];
             if (!provider) {
-                await waSock.sendMessage(from, { text: "❓ Usage: .ai provider <name>\nProviders: openrouter, openai, claude, chatgpt, gemini, rest" }, { quoted: msg });
+                // Show provider selection with buttons
+                await sendButtons(waSock, from, '🤖 *Select AI Provider*', [
+                    { id: 'provider-openai', text: '🌐 OpenAI' },
+                    { id: 'provider-claude', text: '🧠 Claude' },
+                    { id: 'provider-chatgpt', text: '💬 ChatGPT' },
+                    { id: 'provider-gemini', text: '✨ Gemini' },
+                    { id: 'provider-openrouter', text: '🔗 OpenRouter' }
+                ], { footer: 'Atau ketik: .ai provider <name>' });
                 return true;
             }
+            setMainProvider(provider);
+            await waSock.sendMessage(from, { text: `✅ Main AI provider set to: ${provider}` }, { quoted: msg });
+            return true;
+        }
+
+        // Handle button responses for provider selection
+        if (textMessage.trim().startsWith('provider-')) {
+            const provider = textMessage.trim().replace('provider-', '');
             setMainProvider(provider);
             await waSock.sendMessage(from, { text: `✅ Main AI provider set to: ${provider}` }, { quoted: msg });
             return true;
@@ -307,10 +328,40 @@ export async function handleCommands(from, textMessage, msg, waSock) {
             return true;
         }
 
+        if (!sub) {
+            // Show agent selection with list
+            await sendList(waSock, from, '🤖 *Select Agent*', 'Pilih agent untuk membantu task:', 'Pilih Agent', [
+                {
+                    title: '📚 Learning',
+                    rows: [
+                        { title: '📚 Homework', description: 'Bantu tugas sekolah', rowId: '.agent homework ' },
+                        { title: '✍️ Essay', description: 'Bantu karangan', rowId: '.agent essay ' },
+                        { title: '🧮 Solver', description: 'Selesaikan soal mat/fisika', rowId: '.agent solver ' }
+                    ]
+                },
+                {
+                    title: '💼 Productivity',
+                    rows: [
+                        { title: '🔍 Research', description: 'Riset mendalam', rowId: '.agent research ' },
+                        { title: '💻 Code', description: 'Tulis/debug kode', rowId: '.agent code ' },
+                        { title: '🌐 Translate', description: 'Terjemah teks', rowId: '.agent translate ' },
+                        { title: '📝 Summary', description: 'Rangkum teks panjang', rowId: '.agent summary ' }
+                    ]
+                },
+                {
+                    title: '👁️ Media',
+                    rows: [
+                        { title: '👁️ Vision', description: 'Analisis gambar', rowId: '.agent vision ' }
+                    ]
+                }
+            ]);
+            return true;
+        }
+
         if (['research', 'code', 'translate', 'summary', 'homework', 'essay', 'solver', 'vision'].includes(sub)) {
             const task = args.slice(2).join(' ').trim();
             if (!task) {
-                await waSock.sendMessage(from, { text: `❓ Usage: .agent ${sub} <task>` }, { quoted: msg });
+                await waSock.sendMessage(from, { text: `❓ Usage: .agent ${sub} <task>\nExample: .agent homework hitung 2+2` }, { quoted: msg });
                 return true;
             }
             spawnAgent(sub, task, from, waSock);
@@ -409,7 +460,12 @@ export async function handleCommands(from, textMessage, msg, waSock) {
             const ok = deleteNote(from, noteId);
             await waSock.sendMessage(from, { text: ok ? `🗑️ Note ${noteId} deleted.` : `❌ Note ${noteId} not found.` }, { quoted: msg });
         } else {
-            await waSock.sendMessage(from, { text: "❓ *Note Commands:*\n.note add <text>\n.note list\n.note search <query>\n.note delete <id>" }, { quoted: msg });
+            // Show note commands with buttons
+            await sendButtons(waSock, from, '📝 *Note Commands*', [
+                { id: '.note list', text: '📋 List Notes' },
+                { id: '.note add ', text: '➕ Add Note' },
+                { id: '.note search ', text: '🔍 Search' }
+            ], { footer: 'Atau ketik .note <command>' });
         }
         return true;
     }
