@@ -1,0 +1,95 @@
+{
+  "meta": {
+    "version": "PTDL_v2",
+    "version": "https://github.com/parkervcp/eggs/blob/master/README.md"
+  },
+  "name": "OpenXX Bot",
+  "description": "WhatsApp AI Productivity Assistant",
+  "author": "OpenXX",
+  "image": "ghcr.io/parkervcp/yolks:nodejs_18",
+  "startup": "bash scripts/pterodactyl-setup.sh && node index.js",
+  "config": {
+    "files": {
+      ".env": {
+        "parser": "yaml",
+        "find": {
+          "OPENX_DEV_PHONE_NUMBER": {
+            "parser": "text",
+            "name": "WhatsApp Admin Number"
+          },
+          "OPENX_AI_PROVIDER": {
+            "parser": "text",
+            "name": "AI Provider",
+            "default": "openai"
+          },
+          "OPENX_OPENAI_API_KEY": {
+            "parser": "text",
+            "name": "OpenAI API Key"
+          },
+          "OPENX_OPENAI_MODEL": {
+            "parser": "text",
+            "name": "OpenAI Model",
+            "default": "gpt-4o-mini"
+          },
+          "OPENX_TTS_VOICE": {
+            "parser": "text",
+            "name": "TTS Voice ID",
+            "default": "voice_furina_"
+          }
+        }
+      }
+    },
+    "dotfiles": {}
+  },
+  "scripts": {
+    "installation": {
+      "script": "#!/bin/bash\napt-get update -y\napt-get install -y curl git\nbash scripts/pterodactyl-setup.sh",
+      "container": "ghcr.io/parkervcp/yolks:nodejs_18"
+    }
+  },
+  "variables": [
+    {
+      "name": "WhatsApp Admin Number",
+      "description_value": "Your WhatsApp phone number (e.g. 628123456789)",
+      "env_variable": "OPENX_DEV_PHONE_NUMBER",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string"
+    },
+    {
+      "name": "AI Provider",
+      "description_value": "openai, claude, chatgpt, gemini, openrouter",
+      "env_variable": "OPENX_AI_PROVIDER",
+      "user_viewable": true,
+      "user_editable": true,
+      "default_value": "openai",
+      "rules": "required|string|in:openai,claude,chatgpt,gemini,openrouter"
+    },
+    {
+      "name": "OpenAI API Key",
+      "description_value": "API key for OpenAI-compatible provider",
+      "env_variable": "OPENX_OPENAI_API_KEY",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string"
+    },
+    {
+      "name": "OpenAI Model",
+      "description_value": "Model name (e.g. gpt-4o-mini)",
+      "env_variable": "OPENX_OPENAI_MODEL",
+      "user_viewable": true,
+      "user_editable": true,
+      "default_value": "gpt-4o-mini",
+      "rules": "required|string"
+    },
+    {
+      "name": "TTS Voice",
+      "description_value": "Voice ID for TTS (default: voice_furina_)",
+      "env_variable": "OPENX_TTS_VOICE",
+      "user_viewable": true,
+      "user_editable": true,
+      "default_value": "voice_furina_",
+      "rules": "required|string"
+    }
+  ]
+}
