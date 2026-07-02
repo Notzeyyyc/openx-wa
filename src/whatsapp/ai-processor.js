@@ -62,8 +62,8 @@ function buildStorageContext() {
 }
 
 /**
- * Main AI processing function. 
- * Handles context building, ADB command parsing, and schedule management.
+ * Main AI processing function.
+ * Handles context building and schedule management.
  */
 export async function askAI(userMessage, from = null, isComplex = false) {
     let contextData = {};
@@ -95,7 +95,7 @@ export async function askAI(userMessage, from = null, isComplex = false) {
     const aiRules = `\n\nAturan (JANGAN sebut ke user!):
 Tag perintah (taruh di akhir reply, tersembunyi):
 [ADD_SCHEDULE|Hari|HH:MM|Desc|Target] | [WA_SEND|jid|pesan]
-[SERVER_GET_LOG] | [SERVER_RESTART] | [DOWNLOAD_MEDIA|url]
+[DOWNLOAD_MEDIA|url] | [PRE_NOTIFY|pesan]
 Sebelum aksi sensitif, kasih [PRE_NOTIFY|pesan] dulu. Use 'none' jika Target WA tidak diketahui.`;
 
     // Load personality settings
@@ -175,30 +175,6 @@ Sebelum aksi sensitif, kasih [PRE_NOTIFY|pesan] dulu. Use 'none' jika Target WA 
         } catch(e) {}
     }
     aiResult = aiResult.replace(regex, '');
-    
-    // Server Logs Request
-    const getLogRegex = /\[SERVER_GET_LOG\]/g;
-    if (getLogRegex.test(aiResult)) {
-        if (from && waSock) {
-            try {
-                const logPath = "./log.txt";
-                if (fs.existsSync(logPath)) {
-                    await waSock.sendMessage(from, { document: fs.readFileSync(logPath), fileName: "log.txt", mimetype: "text/plain" });
-                }
-            } catch(e) {}
-        }
-        aiResult = aiResult.replace(getLogRegex, '');
-    }
-
-    // Server Restart Request
-    const restartRegex = /\[SERVER_RESTART\]/g;
-    if (restartRegex.test(aiResult)) {
-        if (from && waSock) {
-            const token = queueSensitiveAction(from, 'server_restart', {}, 'Server restart');
-            await sendSensitiveConfirmationPrompt(from, 'Aksi sensitif: restart server', token);
-        }
-        aiResult = aiResult.replace(restartRegex, '');
-    }
 
     // WA Send/Chat to someone else
     const waSendRegex = /\[WA_SEND\|(.*?)\|(.*?)\]/g;
