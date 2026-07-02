@@ -16,6 +16,7 @@ import { handlePluginCommand, reloadPlugins } from '../plugin-manager.mjs';
 import { sendButtons, sendList, sendPoll } from './interactive.js';
 import { addNote, listNotes, deleteNote, searchNotes } from './notes.js';
 import { setReminder, listReminders, cancelReminder } from './reminders.js';
+import { sendVoiceNote, getVoiceList } from './voice-handler.js';
 
 const SENSITIVE_TTL_MS = 2 * 60 * 1000;
 
@@ -414,6 +415,60 @@ export async function handleCommands(from, textMessage, msg, waSock) {
                 ? stats.topCommands.map(([cmd, count]) => `${cmd}: ${count}`).join('\n')
                 : 'No commands used today');
         await waSock.sendMessage(from, { text: msg_text }, { quoted: msg });
+        return true;
+    }
+
+    // Voice Commands
+    if (/^\.voice\b/i.test(textMessage.trim())) {
+        const args = textMessage.trim().split(/\s+/);
+        const sub = args[1]?.toLowerCase();
+
+        if (sub === 'list') {
+            const voices = await getVoiceList();
+            if (voices.length === 0) {
+                await waSock.sendMessage(from, { text: "⚠️ Tidak ada voice tersedia atau API key belum di-set." }, { quoted: msg });
+            } else {
+                const lines = voices.map(v => `• ${v.name} (${v.voice_id})`).join('\n');
+                await waSock.sendMessage(from, { text: `🎤 *Available Voices*\n\n${lines}` }, { quoted: msg });
+            }
+            return true;
+        }
+
+        if (sub === 'set') {
+            const voiceId = args[2];
+            if (!voiceId) {
+                await waSock.sendMessage(from, { text: "❓ Usage: .voice set <voice-id>\nKetik .voice list untuk melihat voice IDs" }, { quoted: msg });
+                return true;
+            }
+            // Save to .env
+            const fs = await import('fs');
+            let env = fs.readFileSync('./.env', 'utf-8');
+            if (env.includes('OPENX_TTS_VOICE=')) {
+                env = env.replace(/OPENX_TTS_VOICE=.*/m, `OPENX_TTS_VOICE=${voiceId}`);
+            } else {
+                env += `\nOPENX_TTS_VOICE=${voiceId}\n`;
+            }
+            fs.writeFileSync('./.env', env);
+            process.env.OPENX_TTS_VOICE = voiceId;
+            await waSock.sendMessage(from, { text: `✅ Voice set to: ${voiceId}` }, { quoted: msg });
+            return true;
+        }
+
+        // Convert text to voice
+        const text = args.slice(1).join(' ').trim();
+        if (!text) {
+            await sendButtons(waSock, from, '🎤 *Voice Note*', [
+                { id: '.voice list', text: '📋 List Voices' },
+                { id: '.voice set ', text: '⚙️ Set Voice' }
+            ], { footer: 'Atau ketik: .voice <text>' });
+            return true;
+        }
+
+        await waSock.sendMessage(from, { text: `🎤 Converting to voice...` }, { quoted: msg });
+        const success = await sendVoiceNote(waSock, from, text, msg);
+        if (!success) {
+            await waSock.sendMessage(from, { text: "⚠️ Gagal convert ke voice. Pastikan API key sudah di-set." }, { quoted: msg });
+        }
         return true;
     }
 
