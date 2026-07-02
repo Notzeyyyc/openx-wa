@@ -1,7 +1,3 @@
-import { exec } from 'child_process';
-import { promisify } from 'util';
-const execPromise = promisify(exec);
-
 export const pendingSensitiveActions = new Map();
 const SENSITIVE_TTL_MS = 2 * 60 * 1000;
 
@@ -42,19 +38,6 @@ export async function sendSensitiveConfirmationPrompt(waSock, jid, title, token)
 export async function executeSensitiveAction(pending, from, waSock) {
     if (!pending) return { ok: false, text: "Aksi tidak ditemukan." };
     try {
-        if (pending.actionType === 'adb_cmd') {
-            const commands = pending.payload?.commands || [];
-            let totalOutput = "";
-            for (const cmd of commands) {
-                try {
-                    const { stdout, stderr } = await execPromise(cmd);
-                    totalOutput += `[Command: ${cmd}]\n${stdout || "(no output)"}\n${stderr ? `ERR: ${stderr}\n` : ""}`;
-                } catch (err) {
-                    totalOutput += `[Command: ${cmd}] FAILED: ${err.message}\n`;
-                }
-            }
-            return { ok: true, text: totalOutput.trim() || "Command selesai dijalankan." };
-        }
         if (pending.actionType === 'server_restart') {
             if (from && waSock) {
                 await waSock.sendMessage(from, { text: "♻️ Restart server dalam 2 detik..." }).catch(() => {});

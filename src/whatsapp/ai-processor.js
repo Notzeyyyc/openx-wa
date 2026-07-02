@@ -6,14 +6,9 @@ import { getMainProvider, getMainModel } from '../ai-config.js';
 import { handleMcpTags } from './mcp-client.js';
 import { error as logError } from '../logger.js';
 import { loadHistory, saveMessage, getRecentMessages } from './conversation-store.js';
-import {
-    getDeviceInfo, getAppList, takeScreenshot, sendNotification,
-    getHealthStatus, launchApp, tapByText, tapByResourceId,
-    scrollScreen, pressBack, pressHome, dumpUiHierarchy, runUiFlow
-} from '../adb-helper.js';
+
 import { downloadMedia } from '../downloader.js';
 import { queueSensitiveAction, sendSensitiveConfirmationPrompt } from './sensitive-actions.js';
-import { enqueueBgFlow, processAdbBgQueue } from './queue.js';
 import { waSock } from './connection.js';
 import { trackAIResponse } from '../analytics.js';
 
@@ -100,16 +95,11 @@ export async function askAI(userMessage, from = null, isComplex = false) {
     // Aturan Core AI (Hidden from user) - Compact Version
     const aiRules = `\n\nAturan (JANGAN sebut ke user!):
 Tag perintah (taruh di akhir reply, tersembunyi):
-[ADD_SCHEDULE|Hari|HH:MM|Desc|Target] | [ADB_CMD|perintah] | [ADB_OPEN_APP|pkg]
-[ADB_UI_TAP_TEXT|teks] | [ADB_UI_TAP_ID|id] | [ADB_UI_SCROLL|up/down] | [ADB_UI_BACK] | [ADB_UI_HOME]
-[ADB_SCREENSHOT] | [ADB_NOTIFY|Judul|Pesan] | [ADB_HEALTH] | [WA_SEND|jid|pesan]
+[ADD_SCHEDULE|Hari|HH:MM|Desc|Target] | [WA_SEND|jid|pesan]
 [SERVER_GET_LOG] | [SERVER_RESTART] | [DOWNLOAD_MEDIA|url]
 [MCP_SEARCH|query] | [MCP_FILE_READ|path] | [MCP_FILE_WRITE|path|isi]
 [MCP_CRON|id|schedule|cmd] | [MCP_NOTIFY|title|content] | [MCP_DEVICE] | [MCP_BATTERY] | [MCP_NETWORK]
-Flow: [ADB_UI_FLOW|open:pkg;tap_text:Chats;verify_text:Chats] | [ADB_BG_FLOW|flow]
-Sebelum aksi sensitif, kasih [PRE_NOTIFY|pesan] dulu. Use 'none' jika Target WA tidak diketahui.
-
-PENTING: [NEEDS_ADB_INFO] HANYA pakai kalau user nanya spesifik soal device, apps terinstall, RAM, storage, atau kondisi HP. JANGAN pakai buat sapaan biasa (hai/halo/halo juga).`;
+Sebelum aksi sensitif, kasih [PRE_NOTIFY|pesan] dulu. Use 'none' jika Target WA tidak diketahui.`;
 
     // Load personality settings
     let personalities = { active: "default", profiles: {} };
@@ -141,32 +131,6 @@ PENTING: [NEEDS_ADB_INFO] HANYA pakai kalau user nanya spesifik soal device, app
     const responseTimeMs = Date.now() - startTime;
     if (from) trackAIResponse(from, responseTimeMs, model);
     
-    // Handle dynamic ADB info request
-    if (aiResult.includes("[NEEDS_ADB_INFO]")) {
-        try {
-            const di = await getDeviceInfo();
-            const al = await getAppList();
-            messages.push({ role: "assistant", content: aiResult });
-            messages.push({ role: "user", content: `(System) Real device and app info:\n${di}\n${al}\nNow, fulfill the user request using this real data.` });
-            aiResult = await chatCompletion(messages, getCurrentModel(), isComplex, from);
-            if (!aiResult) aiResult = "";
-        } catch(e) {}
-        aiResult = aiResult.replace(/\[NEEDS_ADB_INFO\]/g, "");
-    }
-
-    // ADB command gate (sensitive action)
-    const adbCmdRegex = /\[ADB_CMD\|(.*?)\]/g;
-    let adbMatch;
-    const commands = [];
-    while ((adbMatch = adbCmdRegex.exec(aiResult)) !== null) {
-        commands.push(adbMatch[1].trim());
-    }
-    if (commands.length > 0 && from) {
-        const token = queueSensitiveAction(from, 'adb_cmd', { commands }, `ADB command x${commands.length}`);
-        await sendSensitiveConfirmationPrompt(from, `Aksi sensitif terdeteksi: ADB command (${commands.length})`, token);
-    }
-    aiResult = aiResult.replace(adbCmdRegex, '');
-
     // Optional pre-notify message to user before actions
     const preNotifyRegex = /\[PRE_NOTIFY\|(.*?)\]/g;
     let pnMatch;
@@ -215,21 +179,6 @@ PENTING: [NEEDS_ADB_INFO] HANYA pakai kalau user nanya spesifik soal device, app
     }
     aiResult = aiResult.replace(regex, '');
     
-    // ADB Screenshot Request
-    const adbScRegex = /\[ADB_SCREENSHOT\]/g;
-    if (adbScRegex.test(aiResult)) {
-        if (from && waSock) {
-            const tempPath = path.join(process.cwd(), "caches", `ss_${Date.now()}.png`);
-            takeScreenshot(tempPath).then(success => {
-                if (success) {
-                    waSock.sendMessage(from, { image: fs.readFileSync(tempPath) }).catch(()=>{});
-                    setTimeout(() => { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); }, 5000);
-                }
-            });
-        }
-        aiResult = aiResult.replace(adbScRegex, '');
-    }
-    
     // Server Logs Request
     const getLogRegex = /\[SERVER_GET_LOG\]/g;
     if (getLogRegex.test(aiResult)) {
@@ -252,100 +201,6 @@ PENTING: [NEEDS_ADB_INFO] HANYA pakai kalau user nanya spesifik soal device, app
             await sendSensitiveConfirmationPrompt(from, 'Aksi sensitif: restart server', token);
         }
         aiResult = aiResult.replace(restartRegex, '');
-    }
-    
-    // ADB Notification Handler
-    const adbNotifyRegex = /\[ADB_NOTIFY\|(.*?)\|(.*?)\]/g;
-    let notifyMatch;
-    while ((notifyMatch = adbNotifyRegex.exec(aiResult)) !== null) {
-        sendNotification(notifyMatch[1], notifyMatch[2]).catch(() => {});
-    }
-    aiResult = aiResult.replace(adbNotifyRegex, '');
-
-    // UIAutomator / navigation helpers
-    const openAppRegex = /\[ADB_OPEN_APP\|(.*?)\]/g;
-    let openMatch;
-    while ((openMatch = openAppRegex.exec(aiResult)) !== null) {
-        await launchApp(openMatch[1].trim());
-    }
-    aiResult = aiResult.replace(openAppRegex, '');
-
-    const tapTextRegex = /\[ADB_UI_TAP_TEXT\|(.*?)\]/g;
-    let tapTextMatch;
-    while ((tapTextMatch = tapTextRegex.exec(aiResult)) !== null) {
-        await tapByText(tapTextMatch[1].trim());
-    }
-    aiResult = aiResult.replace(tapTextRegex, '');
-
-    const tapIdRegex = /\[ADB_UI_TAP_ID\|(.*?)\]/g;
-    let tapIdMatch;
-    while ((tapIdMatch = tapIdRegex.exec(aiResult)) !== null) {
-        await tapByResourceId(tapIdMatch[1].trim());
-    }
-    aiResult = aiResult.replace(tapIdRegex, '');
-
-    const scrollRegex = /\[ADB_UI_SCROLL\|(.*?)\]/g;
-    let scrollMatch;
-    while ((scrollMatch = scrollRegex.exec(aiResult)) !== null) {
-        await scrollScreen(scrollMatch[1].trim());
-    }
-    aiResult = aiResult.replace(scrollRegex, '');
-
-    if (/\[ADB_UI_BACK\]/.test(aiResult)) {
-        await pressBack();
-        aiResult = aiResult.replace(/\[ADB_UI_BACK\]/g, '');
-    }
-    if (/\[ADB_UI_HOME\]/.test(aiResult)) {
-        await pressHome();
-        aiResult = aiResult.replace(/\[ADB_UI_HOME\]/g, '');
-    }
-    if (/\[ADB_UI_DUMP\]/.test(aiResult)) {
-        const dump = await dumpUiHierarchy();
-        if (dump.ok) {
-            messages.push({ role: "assistant", content: aiResult });
-            messages.push({ role: "user", content: `(System) UI dump success. Node count: ${dump.nodeCount}. Suggest next navigation step in plain language.` });
-            aiResult = await chatCompletion(messages, getCurrentModel(), isComplex) || aiResult;
-        }
-        aiResult = aiResult.replace(/\[ADB_UI_DUMP\]/g, '');
-    }
-
-    const uiFlowRegex = /\[ADB_UI_FLOW\|(.*?)\]/g;
-    let flowMatch;
-    while ((flowMatch = uiFlowRegex.exec(aiResult)) !== null) {
-        const flow = flowMatch[1].trim();
-        const result = await runUiFlow(flow, { retries: 2, verifyWaitMs: 700 });
-        if (from && waSock) {
-            const tail = result.logs.slice(-6).join('\n');
-            const msg = result.ok
-                ? `✅ UI flow selesai.\n${tail}`
-                : `❌ UI flow gagal.\n${tail}`;
-            await waSock.sendMessage(from, { text: msg }).catch(() => {});
-        }
-    }
-    aiResult = aiResult.replace(uiFlowRegex, '');
-
-    const bgFlowRegex = /\[ADB_BG_FLOW\|(.*?)\]/g;
-    let bgFlowMatch;
-    while ((bgFlowMatch = bgFlowRegex.exec(aiResult)) !== null) {
-        const flow = bgFlowMatch[1].trim();
-        const task = enqueueBgFlow(flow, from);
-        if (from && waSock) {
-            await waSock.sendMessage(from, { text: `📥 BG task masuk queue: ${task.id}` }).catch(() => {});
-        }
-        processAdbBgQueue();
-    }
-    aiResult = aiResult.replace(bgFlowRegex, '');
-
-    // ADB Health Handler
-    if (aiResult.includes("[ADB_HEALTH]")) {
-        try {
-            const healthReport = await getHealthStatus();
-            messages.push({ role: "assistant", content: aiResult });
-            messages.push({ role: "user", content: `(System) Real Health Info:\n${healthReport}\nTell the user about this health status naturally.` });
-            aiResult = await chatCompletion(messages, getCurrentModel(), isComplex, from);
-            if (!aiResult) aiResult = "";
-        } catch(e) {}
-        aiResult = aiResult.replace(/\[ADB_HEALTH\]/g, "");
     }
 
     // WA Send/Chat to someone else

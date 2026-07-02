@@ -111,8 +111,7 @@ export const config = {
     openrouter: {
         get apiKeys() { return splitCsv(process.env.OPENX_OPENROUTER_API_KEYS); },
     },
-    adbPort: process.env.OPENX_ADB_PORT || "auto",
-    adbSerial: process.env.OPENX_ADB_SERIAL || "",
+
     mcp: {
         baseUrl: process.env.OPENX_MCP_URL || "http://localhost:8765",
         apiKey: process.env.OPENX_MCP_API_KEY || "",
