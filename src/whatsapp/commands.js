@@ -5,7 +5,7 @@ import {
 } from './helpers.js';
 import { pendingSensitiveActions, executeSensitiveAction } from './sensitive-actions.js';
 import { cancelBgTask, getBgStatusText } from './queue.js';
-import { searchAndDownload } from './music-handler.js';
+import { downloadSong, searchSongs } from './music-handler.js';
 import { clearHistory } from './conversation-store.js';
 import { getRamReport, getRamTrend, forceGarbageCollect } from './ram-monitor.js';
 import { spawnAgent, listAgents, getAgentsStatus, AGENT_TYPES } from './agent-manager.js';
@@ -601,16 +601,10 @@ export async function handleCommands(from, textMessage, msg, waSock) {
     const playMatch = textMessage.trim().match(/^\.play\s+(.+)$/i);
     if (playMatch) {
         const query = playMatch[1].trim();
-        const apikey = process.env.OPENX_MUSIC_API_KEY || '';
 
-        if (!apikey) {
-            await waSock.sendMessage(from, { text: "❌ Music API key not set." }, { quoted: msg });
-            return true;
-        }
+        await waSock.sendMessage(from, { text: `🎵 Searching Spotify: ${query}...` }, { quoted: msg });
 
-        await waSock.sendMessage(from, { text: `🎵 Searching: ${query}...` }, { quoted: msg });
-
-        const result = await searchAndDownload(query, apikey);
+        const result = await downloadSong(query);
 
         if (!result.ok) {
             await waSock.sendMessage(from, { text: `❌ ${result.error}` }, { quoted: msg });
@@ -618,20 +612,63 @@ export async function handleCommands(from, textMessage, msg, waSock) {
         }
 
         try {
-            const audioRes = await fetch(result.audioUrl);
-            const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+            if (result.downloadUrl) {
+                const audioRes = await fetch(result.downloadUrl);
+                const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
 
-            const caption = `🎵 *${result.title}*\n📺 ${result.channel}\n⏱️ ${result.duration}`;
-            await waSock.sendMessage(from, {
-                audio: audioBuffer,
-                mimetype: 'audio/mpeg',
-                ptt: false
-            }, { quoted: msg });
+                await waSock.sendMessage(from, {
+                    audio: audioBuffer,
+                    mimetype: 'audio/mpeg',
+                    ptt: false
+                }, { quoted: msg });
+            }
+
+            const caption = [
+                `🎵 *${result.title}*`,
+                `👤 ${result.artist}`,
+                result.album ? `💿 ${result.album}` : '',
+                result.duration ? `⏱️ ${result.duration}` : '',
+                result.spotifyUrl ? `\n🔗 ${result.spotifyUrl}` : ''
+            ].filter(Boolean).join('\n');
 
             await waSock.sendMessage(from, { text: caption }, { quoted: msg });
         } catch (e) {
-            await waSock.sendMessage(from, { text: `❌ Gagal download audio: ${e.message}` }, { quoted: msg });
+            await waSock.sendMessage(from, { text: `❌ Gagal download: ${e.message}` }, { quoted: msg });
         }
+
+        return true;
+    }
+
+    // Spotify Search
+    const searchMatch = textMessage.trim().match(/^\.spotify\s+(.+)$/i);
+    if (searchMatch) {
+        const query = searchMatch[1].trim();
+        await waSock.sendMessage(from, { text: `🔍 Searching: ${query}...` }, { quoted: msg });
+
+        const result = await searchSongs(query, 5);
+
+        if (!result.ok) {
+            await waSock.sendMessage(from, { text: `❌ ${result.error}` }, { quoted: msg });
+            return true;
+        }
+
+        const songs = Array.isArray(result.results) ? result.results : [];
+        if (songs.length === 0) {
+            await waSock.sendMessage(from, { text: "🔍 Tidak ada hasil ditemukan." }, { quoted: msg });
+            return true;
+        }
+
+        const list = songs.map((s, i) => {
+            const title = s.name || s.title || 'Unknown';
+            const artist = s.artist || s.artists?.[0]?.name || 'Unknown';
+            const duration = s.duration || '';
+            return `${i + 1}. ${title} — ${artist}${duration ? ` (${duration})` : ''}`;
+        }).join('\n');
+
+        await waSock.sendMessage(from, {
+            text: `🎵 *Search Results*\n\n${list}\n\nKetik \`.play <nama lagu>\nuntuk putar.`,
+            footer: 'Spotify via Covenant'
+        }, { quoted: msg });
 
         return true;
     }
