@@ -34,6 +34,11 @@ async function loadProvider(name) {
             provider = { complete: chatCompletion, name: "gemini" };
             break;
         }
+        case "covenant": {
+            const { chatCompletion } = await import("./providers/covenant.js");
+            provider = { complete: chatCompletion, name: "covenant" };
+            break;
+        }
         case "openrouter":
         default: {
             const { chatCompletion } = await import("./providers/openrouter.js");
