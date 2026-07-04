@@ -9,7 +9,7 @@ import { searchAndDownload } from './music-handler.js';
 import { clearHistory } from './conversation-store.js';
 import { getRamReport, getRamTrend, forceGarbageCollect } from './ram-monitor.js';
 import { spawnAgent, listAgents, getAgentsStatus, AGENT_TYPES } from './agent-manager.js';
-import { getAIConfig, setMainProvider, setMainModel, setMainApiKey, setAgentConfig, setAgentApiKey, getAIStatus } from '../ai-config.js';
+import { getAIConfig, setMainProvider, setMainModel, setMainApiKey, setAgentConfig, setAgentApiKey, getAIStatus, setActiveProfile, saveProfile, listProfiles, deleteProfile, setAgentProfile } from '../ai-config.js';
 import { log } from '../logger.js';
 import { getStatsSummary } from '../analytics.js';
 import { handlePluginCommand, reloadPlugins } from '../plugin-manager.mjs';
@@ -226,26 +226,59 @@ export async function handleCommands(from, textMessage, msg, waSock) {
         if (sub === 'provider') {
             const provider = args[2];
             if (!provider) {
-                // Show provider selection with buttons
-                await sendButtons(waSock, from, '🤖 *Select AI Provider*', [
-                    { id: 'provider-openai', text: '🌐 OpenAI' },
-                    { id: 'provider-claude', text: '🧠 Claude' },
-                    { id: 'provider-chatgpt', text: '💬 ChatGPT' },
-                    { id: 'provider-gemini', text: '✨ Gemini' },
-                    { id: 'provider-openrouter', text: '🔗 OpenRouter' }
-                ], { footer: 'Atau ketik: .ai provider <name>' });
+                // Show available profiles
+                const profiles = listProfiles();
+                const buttons = profiles.map(p => ({
+                    id: `switch-${p.name}`,
+                    text: `${p.active ? '✅ ' : ''}${p.name}`
+                }));
+                await sendButtons(waSock, from, '🤖 *Switch AI Provider*\nCurrent: ' + getActiveProfileName(), buttons.slice(0, 5), { footer: 'Atau: .ai switch <name>' });
                 return true;
             }
             setMainProvider(provider);
-            await waSock.sendMessage(from, { text: `✅ Main AI provider set to: ${provider}` }, { quoted: msg });
+            await waSock.sendMessage(from, { text: `✅ Provider set to: ${provider}` }, { quoted: msg });
             return true;
         }
 
-        // Handle button responses for provider selection
-        if (textMessage.trim().startsWith('provider-')) {
-            const provider = textMessage.trim().replace('provider-', '');
-            setMainProvider(provider);
-            await waSock.sendMessage(from, { text: `✅ Main AI provider set to: ${provider}` }, { quoted: msg });
+        if (sub === 'switch') {
+            const name = args[2];
+            if (!name) {
+                const profiles = listProfiles();
+                const list = profiles.map(p => `${p.active ? '✅' : '  '} ${p.name}: ${p.provider}`).join('\n');
+                await waSock.sendMessage(from, { text: `🔄 *Available Profiles*\n\n${list}\n\nUsage: .ai switch <name>` }, { quoted: msg });
+                return true;
+            }
+            if (setActiveProfile(name)) {
+                await waSock.sendMessage(from, { text: `✅ Switched to profile: ${name}` }, { quoted: msg });
+            } else {
+                await waSock.sendMessage(from, { text: `❌ Profile "${name}" not found` }, { quoted: msg });
+            }
+            return true;
+        }
+
+        if (sub === 'save') {
+            const name = args[2];
+            if (!name) {
+                await waSock.sendMessage(from, { text: "❓ Usage: .ai save <profile-name>\nSaves current settings as a new profile" }, { quoted: msg });
+                return true;
+            }
+            saveProfile(name, {});
+            setActiveProfile(name);
+            await waSock.sendMessage(from, { text: `✅ Profile "${name}" created and activated` }, { quoted: msg });
+            return true;
+        }
+
+        if (sub === 'delete') {
+            const name = args[2];
+            if (!name) {
+                await waSock.sendMessage(from, { text: "❓ Usage: .ai delete <profile-name>" }, { quoted: msg });
+                return true;
+            }
+            if (deleteProfile(name)) {
+                await waSock.sendMessage(from, { text: `✅ Profile "${name}" deleted` }, { quoted: msg });
+            } else {
+                await waSock.sendMessage(from, { text: `❌ Cannot delete profile "${name}"` }, { quoted: msg });
+            }
             return true;
         }
 
@@ -313,7 +346,7 @@ export async function handleCommands(from, textMessage, msg, waSock) {
         }
 
         await waSock.sendMessage(from, {
-            text: `❓ *AI Commands:*\n.ai status — lihat config\n.ai phone <number> — set nomor WA admin\n.ai provider <name> — ganti provider\n.ai model <name> — ganti model\n.ai apikey <key> — set API key\n.ai agentkey <type> <key> — set agent API key\n.ai agent <type> <provider> [model] — set agent`
+            text: `❓ *AI Commands:*\n.ai status — lihat config\n.ai switch <name> — switch profile\n.ai save <name> — save current as profile\n.ai delete <name> — delete profile\n.ai provider <name> — set provider\n.ai model <name> — set model\n.ai apikey <key> — set API key\n.ai agent <type> <profile> — set agent profile`
         }, { quoted: msg });
         return true;
     }
