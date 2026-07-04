@@ -8,15 +8,16 @@ import { cancelBgTask, getBgStatusText } from './queue.js';
 import { downloadSong, searchSongs } from './music-handler.js';
 import { clearHistory } from './conversation-store.js';
 import { getRamReport, getRamTrend, forceGarbageCollect } from './ram-monitor.js';
-import { spawnAgent, listAgents, getAgentsStatus, AGENT_TYPES } from './agent-manager.js';
-import { getAIConfig, setMainProvider, setMainModel, setMainApiKey, setAgentConfig, setAgentApiKey, getAIStatus, setActiveProfile, saveProfile, listProfiles, deleteProfile, setAgentProfile } from '../ai-config.js';
+import { spawnAgent, getAgentsStatus } from './agent-manager.js';
+import { getAIConfig, setMainProvider, setMainModel, setMainApiKey, setAgentApiKey, getAIStatus, setActiveProfile, saveProfile, listProfiles, deleteProfile, setAgentProfile } from '../ai-config.js';
 import { log } from '../logger.js';
 import { getStatsSummary } from '../analytics.js';
-import { handlePluginCommand, reloadPlugins } from '../plugin-manager.mjs';
+import { handlePluginCommand } from '../plugin-manager.mjs';
 import { sendButtons, sendList, sendPoll } from './interactive.js';
 import { addNote, listNotes, deleteNote, searchNotes } from './notes.js';
 import { setReminder, listReminders, cancelReminder } from './reminders.js';
 import { sendVoiceNote, getVoiceList } from './voice-handler.js';
+import { getGroup, setGroup } from './group-manager.js';
 
 const SENSITIVE_TTL_MS = 2 * 60 * 1000;
 
@@ -295,14 +296,13 @@ export async function handleCommands(from, textMessage, msg, waSock) {
 
         if (sub === 'agent') {
             const agentType = args[2];
-            const provider = args[3];
-            const model = args.slice(4).join(' ');
-            if (!agentType || !provider) {
-                await waSock.sendMessage(from, { text: "❓ Usage: .ai agent <type> <provider> [model]\nTypes: research, code, translate, summary, homework, essay, solver, vision" }, { quoted: msg });
+            const profileName = args[3];
+            if (!agentType || !profileName) {
+                await waSock.sendMessage(from, { text: "❓ Usage: .ai agent <type> <profile-name>\nTypes: research, code, translate, summary, homework, essay, solver, vision" }, { quoted: msg });
                 return true;
             }
-            setAgentConfig(agentType, provider, model || undefined);
-            await waSock.sendMessage(from, { text: `✅ Agent ${agentType} → ${provider}${model ? '/' + model : ''}` }, { quoted: msg });
+            setAgentProfile(agentType, profileName);
+            await waSock.sendMessage(from, { text: `✅ Agent ${agentType} → profile: ${profileName}` }, { quoted: msg });
             return true;
         }
 

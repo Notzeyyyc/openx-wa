@@ -1,4 +1,4 @@
-import { makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestWaWebVersion } from '@whiskeysockets/baileys';
+import { makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestWaWebVersion } from '@crysnovax/baileys';
 import pino from 'pino';
 import qrcode from 'qrcode-terminal';
 import fs from 'fs';

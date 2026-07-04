@@ -170,6 +170,18 @@ export function setMainApiKey(apiKey) {
     saveConfig(cfg);
 }
 
-export function setAgentConfig(agentType, provider, model) {
-    // Legacy support
+export function setAgentApiKey(agentType, apiKey) {
+    const cfg = getConfig();
+    const agentProfile = cfg.agents[agentType]?.profile;
+    if (agentProfile && cfg.profiles[agentProfile]) {
+        cfg.profiles[agentProfile].apiKey = apiKey;
+        saveConfig(cfg);
+    }
+}
+
+export function setAgentConfig(agentType, profileName) {
+    const cfg = getConfig();
+    if (!cfg.agents[agentType]) cfg.agents[agentType] = {};
+    cfg.agents[agentType].profile = profileName || '';
+    saveConfig(cfg);
 }

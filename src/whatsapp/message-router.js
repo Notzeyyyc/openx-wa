@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import pino from 'pino';
-import { downloadMediaMessage } from '@whiskeysockets/baileys';
+import { downloadMediaMessage } from '@crysnovax/baileys';
 import { loadJsonConfig } from '../config.js';
 import { log as logFn, error as logError } from '../logger.js';
 import { chatCompletion } from '../ai-provider.js';

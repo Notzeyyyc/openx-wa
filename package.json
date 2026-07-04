@@ -14,8 +14,8 @@
   "license": "ISC",
   "packageManager": "pnpm@10.26.2",
   "dependencies": {
+    "@crysnovax/baileys": "^2.6.7",
     "@openrouter/sdk": "^0.10.2",
-    "@whiskeysockets/baileys": "7.0.0-rc.9",
     "axios": "^1.18.1",
     "chalk": "^5.6.2",
     "node-cron": "^4.2.1",
