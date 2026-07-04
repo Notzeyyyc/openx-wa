@@ -1,6 +1,6 @@
 /**
- * Smart response formatter for AI messages
- * Detects content type and uses appropriate Baileys features
+ * Meta AI-style response formatter
+ * Balanced, clean, and interactive
  */
 
 /**
@@ -15,11 +15,33 @@ function detectContentType(text) {
 }
 
 /**
+ * Balance text length — split if too long, pad if too short
+ */
+function balanceText(text, maxLen = 2000) {
+    if (!text) return text;
+
+    // Clean up excessive newlines
+    text = text.replace(/\n{3,}/g, '\n\n').trim();
+
+    // If within limit, return as-is
+    if (text.length <= maxLen) return text;
+
+    // Split at paragraph boundaries
+    const paragraphs = text.split('\n\n');
+    let result = '';
+    for (const para of paragraphs) {
+        if ((result + '\n\n' + para).length > maxLen) break;
+        result += (result ? '\n\n' : '') + para;
+    }
+    return result || text.slice(0, maxLen);
+}
+
+/**
  * Format code block response
  */
 function formatCodeBlock(text) {
     const codeMatch = text.match(/```(\w+)?\n([\s\S]*?)```/);
-    if (!codeMatch) return { text };
+    if (!codeMatch) return null;
 
     const lang = codeMatch[1] || 'text';
     const code = codeMatch[2].trim();
@@ -27,7 +49,7 @@ function formatCodeBlock(text) {
     const after = text.slice(text.lastIndexOf('```') + 3).trim();
 
     return {
-        disclaimerText: 'Code Block',
+        disclaimerText: '💻 Code',
         headerText: before || undefined,
         code,
         language: lang,
@@ -52,10 +74,10 @@ function formatTable(text) {
         }
     }
 
-    if (tableRows.length < 2) return { text };
+    if (tableRows.length < 2) return null;
 
     return {
-        disclaimerText: 'Table',
+        disclaimerText: '📊 Table',
         title: caption.trim() || undefined,
         table: tableRows,
         footerText: 'OpenXX'
@@ -63,23 +85,20 @@ function formatTable(text) {
 }
 
 /**
- * Format list response
- */
-function formatList(text) {
-    // Just return styled text - lists work better as formatted text
-    return { text };
-}
-
-/**
- * Send thinking indicator (Meta AI style)
+ * Send thinking indicator with steps (Meta AI style)
  */
 export async function sendThinkingIndicator(waSock, jid, description = 'Thinking...') {
     try {
-        const { default: baileys } = await import('@crysnovax/baileys');
-        if (baileys.metaTyping) {
-            return await baileys.metaTyping(waSock, jid, {
+        const { metaTyping, buildSteps } = await import('@crysnovax/baileys');
+        if (metaTyping) {
+            const steps = buildSteps([
+                'Reading your message...',
+                'Analyzing context...',
+                'Generating response...'
+            ]);
+            return await metaTyping(waSock, jid, {
                 description,
-                steps: []
+                steps
             });
         }
     } catch {}
@@ -97,17 +116,18 @@ export async function deleteThinkingIndicator(waSock, jid, placeholder) {
 }
 
 /**
- * Send formatted AI response
+ * Send formatted AI response (Meta AI style)
  */
 export async function sendFormattedResponse(waSock, jid, text, quoted, options = {}) {
     if (!text || text.length === 0) {
-        await waSock.sendMessage(jid, { text: 'No response generated.' }, { quoted });
+        await waSock.sendMessage(jid, { text: '🤔 Hmm, I could not generate a response.' }, { quoted });
         return;
     }
 
-    const contentType = detectContentType(text);
+    // Balance text length
+    text = balanceText(text);
 
-    // Try rich message format first
+    const contentType = detectContentType(text);
     let richContent = null;
 
     if (contentType === 'code') {
@@ -116,12 +136,12 @@ export async function sendFormattedResponse(waSock, jid, text, quoted, options =
         richContent = formatTable(text);
     }
 
-    if (richContent && richContent.code) {
-        // Send as rich code message
+    // Try rich message first
+    if (richContent) {
         try {
             await waSock.sendMessage(jid, {
                 ...richContent,
-                footer: 'OpenXX'
+                footer: '✨ OpenXX'
             }, { quoted });
             return;
         } catch (e) {
@@ -129,29 +149,15 @@ export async function sendFormattedResponse(waSock, jid, text, quoted, options =
         }
     }
 
-    if (richContent && richContent.table) {
-        // Send as table message
-        try {
-            await waSock.sendMessage(jid, {
-                ...richContent,
-                footer: 'OpenXX'
-            }, { quoted });
-            return;
-        } catch (e) {
-            // Fallback to plain text
-        }
-    }
-
-    // Default: send as styled text with footer
+    // Default: clean styled text
     await waSock.sendMessage(jid, {
         text,
-        footer: 'OpenXX',
-        buttons: options.buttons || []
+        footer: '✨ OpenXX'
     }, { quoted });
 }
 
 /**
- * Strip markdown for plain text fallback
+ * Strip markdown for plain text
  */
 export function stripMarkdown(text) {
     if (!text) return text;
