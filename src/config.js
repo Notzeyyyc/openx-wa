@@ -107,11 +107,6 @@ export const config = {
             webSearch: (process.env.OPENX_GEMINI_WEB_SEARCH || "false") === "true",
             deepResearch: (process.env.OPENX_GEMINI_DEEP_RESEARCH || "false") === "true",
         },
-        covenant: {
-            baseUrl: process.env.OPENX_COVENANT_BASE_URL || "https://api.covenant.sbs/api/ai/gemini",
-            apiKey: process.env.OPENX_COVENANT_API_KEY || "",
-            model: process.env.OPENX_COVENANT_MODEL || "google/gemini-2.5-flash",
-        },
     },
     openrouter: {
         get apiKeys() { return splitCsv(process.env.OPENX_OPENROUTER_API_KEYS); },

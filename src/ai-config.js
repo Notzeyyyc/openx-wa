@@ -11,7 +11,6 @@ const DEFAULT_CONFIG = {
         claude: { provider: 'claude', model: 'anthropic/claude-opus-4.8', apiKey: '', baseUrl: 'https://fgsi.dpdns.org/api/ai/claude' },
         chatgpt: { provider: 'chatgpt', model: 'openai/gpt-4o', apiKey: '', baseUrl: 'https://fgsi.dpdns.org/api/ai/chatgpt' },
         gemini: { provider: 'gemini', model: 'google/gemini-2.5-flash', apiKey: '', baseUrl: 'https://fgsi.dpdns.org/api/ai/gemini' },
-        covenant: { provider: 'covenant', model: 'google/gemini-2.5-flash', apiKey: '', baseUrl: 'https://api.covenant.sbs/api/ai/gemini' },
     },
     agents: {
         research: { profile: '' },
