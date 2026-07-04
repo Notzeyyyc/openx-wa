@@ -9,7 +9,7 @@ import { downloadSong, searchSongs } from './music-handler.js';
 import { clearHistory } from './conversation-store.js';
 import { getRamReport, getRamTrend, forceGarbageCollect } from './ram-monitor.js';
 import { spawnAgent, getAgentsStatus } from './agent-manager.js';
-import { getAIConfig, setMainProvider, setMainModel, setMainApiKey, setAgentApiKey, getAIStatus, setActiveProfile, saveProfile, listProfiles, deleteProfile, setAgentProfile } from '../ai-config.js';
+import { getAIConfig, setMainProvider, setMainModel, setMainApiKey, setAgentApiKey, getAIStatus, getActiveProfileName, setActiveProfile, saveProfile, listProfiles, deleteProfile, setAgentProfile } from '../ai-config.js';
 import { log } from '../logger.js';
 import { getStatsSummary } from '../analytics.js';
 import { handlePluginCommand } from '../plugin-manager.mjs';

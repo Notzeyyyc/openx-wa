@@ -58,7 +58,13 @@ export async function chatCompletion(messages, modelOverride = null, isComplex =
 
         const data = await response.json();
         let content = "";
-        if (data.data) {
+
+        // FGSi format: { data: { text, chatId } }
+        if (data.data?.text) {
+            content = data.data.text;
+        }
+        // Standard format
+        else if (data.data) {
             if (typeof data.data === "string") content = data.data;
             else if (typeof data.data === "object") {
                 content = data.data.response || data.data.content || data.data.message || data.data.choices?.[0]?.message?.content || JSON.stringify(data.data);
