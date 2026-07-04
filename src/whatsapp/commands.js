@@ -13,7 +13,7 @@ import { getAIConfig, setMainProvider, setMainModel, setMainApiKey, setAgentApiK
 import { log } from '../logger.js';
 import { getStatsSummary } from '../analytics.js';
 import { handlePluginCommand } from '../plugin-manager.mjs';
-import { sendButtons, sendList, sendPoll } from './interactive.js';
+import { sendButtons, sendList, sendPoll, sendCarousel } from './interactive.js';
 import { addNote, listNotes, deleteNote, searchNotes } from './notes.js';
 import { setReminder, listReminders, cancelReminder } from './reminders.js';
 import { sendVoiceNote, getVoiceList } from './voice-handler.js';
@@ -602,7 +602,7 @@ export async function handleCommands(from, textMessage, msg, waSock) {
     if (playMatch) {
         const query = playMatch[1].trim();
 
-        await waSock.sendMessage(from, { text: `🎵 Searching Spotify: ${query}...` }, { quoted: msg });
+        await waSock.sendMessage(from, { text: `🎵 Searching: ${query}...` }, { quoted: msg });
 
         const result = await downloadSong(query);
 
@@ -612,6 +612,7 @@ export async function handleCommands(from, textMessage, msg, waSock) {
         }
 
         try {
+            // Send audio
             if (result.downloadUrl) {
                 const audioRes = await fetch(result.downloadUrl);
                 const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
@@ -623,15 +624,22 @@ export async function handleCommands(from, textMessage, msg, waSock) {
                 }, { quoted: msg });
             }
 
-            const caption = [
-                `🎵 *${result.title}*`,
-                `👤 ${result.artist}`,
-                result.album ? `💿 ${result.album}` : '',
-                result.duration ? `⏱️ ${result.duration}` : '',
-                result.spotifyUrl ? `\n🔗 ${result.spotifyUrl}` : ''
-            ].filter(Boolean).join('\n');
-
-            await waSock.sendMessage(from, { text: caption }, { quoted: msg });
+            // Send info card with cover image
+            if (result.image) {
+                await waSock.sendMessage(from, {
+                    image: { url: result.image },
+                    caption: `🎵 *${result.title}*\n👤 ${result.artist}${result.album ? `\n💿 ${result.album}` : ''}${result.duration ? `\n⏱️ ${result.duration}` : ''}`,
+                    footer: '✨ OpenXX Music'
+                }, { quoted: msg });
+            } else {
+                const caption = [
+                    `🎵 *${result.title}*`,
+                    `👤 ${result.artist}`,
+                    result.album ? `💿 ${result.album}` : '',
+                    result.duration ? `⏱️ ${result.duration}` : ''
+                ].filter(Boolean).join('\n');
+                await waSock.sendMessage(from, { text: caption, footer: '✨ OpenXX Music' }, { quoted: msg });
+            }
         } catch (e) {
             await waSock.sendMessage(from, { text: `❌ Gagal download: ${e.message}` }, { quoted: msg });
         }
@@ -658,17 +666,19 @@ export async function handleCommands(from, textMessage, msg, waSock) {
             return true;
         }
 
-        const list = songs.map((s, i) => {
-            const title = s.name || s.title || 'Unknown';
-            const artist = s.artist || s.artists?.[0]?.name || 'Unknown';
-            const duration = s.duration || '';
-            return `${i + 1}. ${title} — ${artist}${duration ? ` (${duration})` : ''}`;
-        }).join('\n');
+        // Send as carousel with cover images
+        const cards = songs.slice(0, 5).map((s, i) => ({
+            image: s.cover || undefined,
+            caption: `🎵 *${s.title || 'Unknown'}*\n👤 ${s.artists || 'Unknown'}${s.duration ? `\n⏱️ ${s.duration}` : ''}`,
+            footer: `${i + 1}/${songs.length}`,
+            buttons: [{ text: 'Play', id: `.play ${s.title || ''}` }]
+        }));
 
-        await waSock.sendMessage(from, {
-            text: `🎵 *Search Results*\n\n${list}\n\nKetik \`.play <nama lagu>\nuntuk putar.`,
-            footer: 'Spotify via Covenant'
-        }, { quoted: msg });
+        await sendCarousel(waSock, from, {
+            title: `🎵 Search: ${query}`,
+            footer: 'Spotify via Covenant',
+            cards
+        });
 
         return true;
     }
