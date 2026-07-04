@@ -28,6 +28,10 @@ function getConfig() {
     return loadJsonConfig(CONFIG_PATH, DEFAULT_CONFIG);
 }
 
+export function getAIConfig() {
+    return getConfig();
+}
+
 function saveConfig(cfg) {
     writeJsonConfig(CONFIG_PATH, cfg);
 }
