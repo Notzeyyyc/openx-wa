@@ -85,33 +85,103 @@ function formatTable(text) {
 }
 
 /**
- * Send thinking indicator with steps (Meta AI style)
+ * Random thinking phrases
  */
-export async function sendThinkingIndicator(waSock, jid, description = 'Thinking...') {
-    try {
-        const { metaTyping, buildSteps } = await import('@crysnovax/baileys');
-        if (metaTyping) {
-            const steps = buildSteps([
-                'Reading your message...',
-                'Analyzing context...',
-                'Generating response...'
-            ]);
-            return await metaTyping(waSock, jid, {
-                description,
-                steps
-            });
-        }
-    } catch {}
-    return null;
+const THINKING_PHRASES = [
+    'Analyzing your message...',
+    'Processing your request...',
+    'Thinking about this...',
+    'Let me work on that...',
+    'Working on it...',
+    'Computing response...',
+    'Generating answer...',
+    'Reading context...',
+    'Understanding intent...',
+    'Preparing response...'
+];
+
+/**
+ * Random step descriptions
+ */
+const STEP_DESCRIPTIONS = [
+    ['Reading your message...', 'Understanding context...', 'Generating response...'],
+    ['Processing request...', 'Analyzing data...', 'Formulating answer...'],
+    ['Thinking...', 'Checking knowledge...', 'Composing reply...'],
+    ['Analyzing...', 'Finding best approach...', 'Writing response...'],
+    ['Loading context...', 'Processing...', 'Almost done...']
+];
+
+function getRandomPhrase() {
+    return THINKING_PHRASES[Math.floor(Math.random() * THINKING_PHRASES.length)];
+}
+
+function getRandomSteps() {
+    return STEP_DESCRIPTIONS[Math.floor(Math.random() * STEP_DESCRIPTIONS.length)];
 }
 
 /**
- * Delete thinking indicator
+ * Send thinking indicator with live updates (Meta AI style)
+ * Returns an object with update() and done() methods
+ */
+export async function sendThinkingIndicator(waSock, jid) {
+    const phrase = getRandomPhrase();
+    const steps = getRandomSteps();
+
+    // Send initial message
+    const sentMsg = await waSock.sendMessage(jid, {
+        text: `_${phrase}_\n\n○ ${steps[0]}\n○ ${steps[1]}\n○ ${steps[2]}`
+    }).catch(() => null);
+
+    if (!sentMsg?.key?.id) return { update: async () => {}, done: async () => {} };
+
+    const msgId = sentMsg.key.id;
+    let stepIndex = 0;
+
+    return {
+        // Update to next step
+        update: async () => {
+            stepIndex++;
+            if (stepIndex >= steps.length) return;
+
+            let text = `_${phrase}_\n`;
+            for (let i = 0; i < steps.length; i++) {
+                if (i < stepIndex) {
+                    text += `✓ ${steps[i]}\n`;
+                } else if (i === stepIndex) {
+                    text += `○ ${steps[i]}\n`;
+                } else {
+                    text += `○ ${steps[i]}\n`;
+                }
+            }
+
+            await waSock.sendMessage(jid, {
+                text,
+                edit: { remoteJid: jid, id: msgId, fromMe: true }
+            }).catch(() => {});
+        },
+        // Mark as done
+        done: async () => {
+            let text = '';
+            for (const step of steps) {
+                text += `✓ ${step}\n`;
+            }
+            text += '\n✨ Generating response...';
+
+            await waSock.sendMessage(jid, {
+                text,
+                edit: { remoteJid: jid, id: msgId, fromMe: true }
+            }).catch(() => {});
+        }
+    };
+}
+
+/**
+ * Delete thinking indicator (legacy, now just deletes the message)
  */
 export async function deleteThinkingIndicator(waSock, jid, placeholder) {
-    if (!placeholder?.key) return;
+    if (!placeholder?.msgId) return;
     try {
-        await waSock.sendMessage(jid, { delete: placeholder.key });
+        await waSock.sendMessage(jid, { delete: { remoteJid: jid, id: placeholder.msgId, fromMe: true } });
     } catch {}
 }
 
