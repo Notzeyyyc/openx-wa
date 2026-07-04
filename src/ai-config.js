@@ -141,6 +141,10 @@ export function getAgentModel(agentType) {
     return getAgentProfile(agentType).model || '';
 }
 
+export function getAgentApiKey(agentType) {
+    return getAgentProfile(agentType).apiKey || '';
+}
+
 export function setMainProvider(provider) {
     const cfg = getConfig();
     const active = cfg.profiles[cfg.active];
