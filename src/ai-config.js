@@ -152,7 +152,33 @@ export function getAgentApiKey(agentType) {
 export function setMainProvider(provider) {
     const cfg = getConfig();
     const active = cfg.profiles[cfg.active];
-    if (active) active.provider = provider;
+    if (active) {
+        active.provider = provider;
+        // Auto-update baseUrl based on provider
+        const BASE_URLS = {
+            openai: 'https://ai.sumopod.com',
+            claude: 'https://fgsi.dpdns.org/api/ai/claude',
+            chatgpt: 'https://fgsi.dpdns.org/api/ai/chatgpt',
+            gemini: 'https://fgsi.dpdns.org/api/ai/gemini',
+            openrouter: '',
+            rest: ''
+        };
+        if (BASE_URLS[provider] !== undefined) {
+            active.baseUrl = BASE_URLS[provider];
+        }
+        // Auto-update model based on provider
+        const DEFAULT_MODELS = {
+            openai: 'gpt-4o-mini',
+            claude: 'anthropic/claude-opus-4.8',
+            chatgpt: 'openai/gpt-4o',
+            gemini: 'google/gemini-2.5-pro',
+            openrouter: '',
+            rest: ''
+        };
+        if (!active.model || Object.values(DEFAULT_MODELS).includes(active.model)) {
+            active.model = DEFAULT_MODELS[provider] || '';
+        }
+    }
     saveConfig(cfg);
 }
 
