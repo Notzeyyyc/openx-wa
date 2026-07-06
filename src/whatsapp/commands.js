@@ -780,42 +780,6 @@ export async function handleCommands(from, textMessage, msg, waSock) {
         return true;
     }
 
-        try {
-            // Send audio
-            if (result.downloadUrl) {
-                const audioRes = await fetch(result.downloadUrl);
-                const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
-
-                await waSock.sendMessage(from, {
-                    audio: audioBuffer,
-                    mimetype: 'audio/mpeg',
-                    ptt: false
-                }, { quoted: msg });
-            }
-
-            // Send info card with cover image
-            if (result.image) {
-                await waSock.sendMessage(from, {
-                    image: { url: result.image },
-                    caption: `🎵 *${result.title}*\n👤 ${result.artist}${result.album ? `\n💿 ${result.album}` : ''}${result.duration ? `\n⏱️ ${result.duration}` : ''}`,
-                    footer: '✨ OpenXX Music'
-                }, { quoted: msg });
-            } else {
-                const caption = [
-                    `🎵 *${result.title}*`,
-                    `👤 ${result.artist}`,
-                    result.album ? `💿 ${result.album}` : '',
-                    result.duration ? `⏱️ ${result.duration}` : ''
-                ].filter(Boolean).join('\n');
-                await waSock.sendMessage(from, { text: caption, footer: '✨ OpenXX Music' }, { quoted: msg });
-            }
-        } catch (e) {
-            await waSock.sendMessage(from, { text: `❌ Gagal download: ${e.message}` }, { quoted: msg });
-        }
-
-        return true;
-    }
-
     // Spotify Search
     const searchMatch = textMessage.trim().match(/^\.spotify\s+(.+)$/i);
     if (searchMatch) {
