@@ -780,60 +780,6 @@ export async function handleCommands(from, textMessage, msg, waSock) {
         return true;
     }
 
-    // Handle track play from carousel button
-    const trackPlayMatch = textMessage.trim().match(/^playtrack:(.+)$/i);
-    if (trackPlayMatch) {
-        const trackId = trackPlayMatch[1].trim();
-        const track = getCachedTrack(trackId);
-
-        if (!track) {
-            await waSock.sendMessage(from, { text: "⚠️ Track expired. Cari ulang dengan .spotify" }, { quoted: msg });
-            return true;
-        }
-
-        await waSock.sendMessage(from, { text: `🎵 Playing: ${track.title || track.name}...` }, { quoted: msg });
-
-        // Use preview_url directly
-        if (track.preview_url) {
-            try {
-                const audioRes = await fetch(track.preview_url);
-                const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
-
-                await waSock.sendMessage(from, {
-                    audio: audioBuffer,
-                    mimetype: 'audio/mpeg',
-                    ptt: false
-                }, { quoted: msg });
-
-                // Send info
-                if (track.cover) {
-                    await waSock.sendMessage(from, {
-                        image: { url: track.cover },
-                        caption: `🎵 *${track.title || track.name}*\n👤 ${track.artists || 'Unknown'}${track.duration ? `\n⏱️ ${track.duration}` : ''}`,
-                        footer: '✨ OpenXX Music'
-                    }, { quoted: msg });
-                } else {
-                    await waSock.sendMessage(from, {
-                        text: `🎵 *${track.title || track.name}*\n👤 ${track.artists || 'Unknown'}${track.duration ? `\n⏱️ ${track.duration}` : ''}`,
-                        footer: '✨ OpenXX Music'
-                    }, { quoted: msg });
-                }
-            } catch (e) {
-                await waSock.sendMessage(from, { text: `❌ Gagal play: ${e.message}` }, { quoted: msg });
-            }
-        } else {
-            // Fallback: search and download
-            const dlResult = await downloadSong(track.title || track.name);
-            if (dlResult.ok && dlResult.downloadUrl) {
-                const audioRes = await fetch(dlResult.downloadUrl);
-                const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
-                await waSock.sendMessage(from, { audio: audioBuffer, mimetype: 'audio/mpeg', ptt: false }, { quoted: msg });
-            }
-        }
-
-        return true;
-    }
-
     // Album Command
     const albumMatch = textMessage.trim().match(/^\.album\s+(.+)$/i);
     if (albumMatch) {
