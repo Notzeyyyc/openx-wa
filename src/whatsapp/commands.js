@@ -5,7 +5,7 @@ import {
 } from './helpers.js';
 import { pendingSensitiveActions, executeSensitiveAction } from './sensitive-actions.js';
 import { cancelBgTask, getBgStatusText } from './queue.js';
-import { downloadSong, searchSongs } from './music-handler.js';
+import { downloadSong, searchSongs, downloadByTrackUrl } from './music-handler.js';
 import { clearHistory } from './conversation-store.js';
 import { getRamReport, getRamTrend, forceGarbageCollect } from './ram-monitor.js';
 import { spawnAgent, getAgentsStatus } from './agent-manager.js';
@@ -600,11 +600,15 @@ export async function handleCommands(from, textMessage, msg, waSock) {
     // Music Player
     const playMatch = textMessage.trim().match(/^\.play\s+(.+)$/i);
     if (playMatch) {
-        const query = playMatch[1].trim();
+        const input = playMatch[1].trim();
 
-        await waSock.sendMessage(from, { text: `🎵 Searching: ${query}...` }, { quoted: msg });
+        await waSock.sendMessage(from, { text: `🎵 Searching: ${input}...` }, { quoted: msg });
 
-        const result = await downloadSong(query);
+        // Check if input is a URL
+        const isUrl = input.startsWith('http://') || input.startsWith('https://');
+        const result = isUrl
+            ? await downloadByTrackUrl(input)
+            : await downloadSong(input);
 
         if (!result.ok) {
             await waSock.sendMessage(from, { text: `❌ ${result.error}` }, { quoted: msg });
