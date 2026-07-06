@@ -16,12 +16,12 @@ import { getAIConfig, setMainProvider, setMainModel, setMainApiKey, setAgentApiK
 import { log } from '../logger.js';
 import { getStatsSummary } from '../analytics.js';
 import { handlePluginCommand } from '../plugin-manager.mjs';
-import { sendButtons, sendList, sendPoll, sendCarousel } from './interactive.js';
+import { sendButtons, sendList } from './interactive.js';
 import { addNote, listNotes, deleteNote, searchNotes } from './notes.js';
 import { setReminder, listReminders, cancelReminder } from './reminders.js';
 import { sendVoiceNote, getVoiceList } from './voice-handler.js';
-import { getGroup, setGroup } from './group-manager.js';
-import { trainGroup, addGroupRule, removeGroupRule, addGroupTopic, getGroupContext, getGroupTraining, listGroups } from './group-training.js';
+import { getGroup, setGroup, setGroupApproved, setGroupDelay } from './group-manager.js';
+import { trainGroup, addGroupRule, removeGroupRule, addGroupTopic, getGroupContext, getGroupTraining } from './group-training.js';
 
 const SENSITIVE_TTL_MS = 2 * 60 * 1000;
 

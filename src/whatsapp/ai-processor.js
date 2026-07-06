@@ -190,7 +190,7 @@ Sebelum aksi sensitif, kasih [PRE_NOTIFY|pesan] dulu. Use 'none' jika Target WA 
     }
     if (waPending.length > 0 && from && waSock) {
         const token = queueSensitiveAction(from, 'wa_send', { messages: waPending }, `WA send x${waPending.length}`);
-        await sendSensitiveConfirmationPrompt(from, `Aksi sensitif: kirim pesan ke nomor lain (${waPending.length} target)`, token);
+        await sendSensitiveConfirmationPrompt(waSock, from, `Aksi sensitif: kirim pesan ke nomor lain (${waPending.length} target)`, token);
     }
     aiResult = aiResult.replace(waSendRegex, '');
 
