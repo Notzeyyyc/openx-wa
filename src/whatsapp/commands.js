@@ -603,7 +603,8 @@ export async function handleCommands(from, textMessage, msg, waSock) {
     if (playMatch) {
         const input = playMatch[1].trim();
 
-        await waSock.sendMessage(from, { text: `🎵 Searching: ${input}...` }, { quoted: msg });
+        // Send searching message (will be edited later)
+        const searchMsg = await waSock.sendMessage(from, { text: `🔍 Searching: ${input}...` });
 
         // Check if input is a URL
         const isUrl = input.startsWith('http://') || input.startsWith('https://');
@@ -615,6 +616,169 @@ export async function handleCommands(from, textMessage, msg, waSock) {
             await waSock.sendMessage(from, { text: `❌ ${result.error}` }, { quoted: msg });
             return true;
         }
+
+        try {
+            // Edit message to show playing status with externalAdReply
+            if (result.image) {
+                await waSock.sendMessage(from, {
+                    text: `🎵 Now Playing`,
+                    edit: searchMsg.key,
+                    externalAdReply: {
+                        title: result.title || 'Unknown',
+                        body: `${result.artist || 'Unknown'}${result.album ? ` • ${result.album}` : ''}${result.duration ? ` • ${result.duration}` : ''}`,
+                        thumbnail: { url: result.image },
+                        largeThumbnail: true,
+                        sourceUrl: 'https://open.spotify.com'
+                    }
+                });
+            } else {
+                await waSock.sendMessage(from, {
+                    text: `🎵 *${result.title}*\n👤 ${result.artist}${result.album ? `\n💿 ${result.album}` : ''}${result.duration ? `\n⏱️ ${result.duration}` : ''}`,
+                    edit: searchMsg.key
+                });
+            }
+
+            // Send audio
+            if (result.downloadUrl) {
+                const audioRes = await fetch(result.downloadUrl);
+                const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+
+                await waSock.sendMessage(from, {
+                    audio: audioBuffer,
+                    mimetype: 'audio/mpeg',
+                    ptt: false
+                }, { quoted: msg });
+            }
+        } catch (e) {
+            await waSock.sendMessage(from, { text: `❌ Gagal play: ${e.message}` }, { quoted: msg });
+        }
+
+        return true;
+    }
+
+    // Spotify Search
+    const searchMatch = textMessage.trim().match(/^\.spotify\s+(.+)$/i);
+    if (searchMatch) {
+        const query = searchMatch[1].trim();
+
+        // Send searching message (will be edited)
+        const searchMsg = await waSock.sendMessage(from, { text: `🔍 Searching: ${query}...` });
+
+        const result = await searchSongs(query, 5);
+
+        if (!result.ok) {
+            await waSock.sendMessage(from, { text: `❌ ${result.error}` }, { quoted: msg });
+            return true;
+        }
+
+        const songs = Array.isArray(result.results) ? result.results : [];
+        if (songs.length === 0) {
+            await waSock.sendMessage(from, { text: "🔍 Tidak ada hasil ditemukan." }, { quoted: msg });
+            return true;
+        }
+
+        // Cache results and get IDs
+        const cacheIds = cacheSearchResults(songs);
+
+        // Edit message to show first result with externalAdReply
+        const first = songs[0];
+        if (first.cover) {
+            await waSock.sendMessage(from, {
+                text: `🎵 Found ${songs.length} results`,
+                edit: searchMsg.key,
+                externalAdReply: {
+                    title: first.title || 'Unknown',
+                    body: `${first.artists || 'Unknown'}${first.duration ? ` • ${first.duration}` : ''}\nTap ▶ Play untuk putar`,
+                    thumbnail: { url: first.cover },
+                    largeThumbnail: true,
+                    sourceUrl: first.spotify_search_url || 'https://open.spotify.com'
+                }
+            });
+        } else {
+            await waSock.sendMessage(from, {
+                text: `🎵 *${first.title || 'Unknown'}*\n👤 ${first.artists || 'Unknown'}${first.duration ? `\n⏱️ ${first.duration}` : ''}\n\nTap ▶ Play untuk putar`,
+                edit: searchMsg.key
+            });
+        }
+
+        // Send track list with cached play buttons
+        const trackList = songs.map((s, i) => {
+            return `${i + 1}. ${s.title || 'Unknown'} — ${s.artists || 'Unknown'} (${s.duration || ''})`;
+        }).join('\n');
+
+        await sendButtons(waSock, from, `🎵 *Search Results*\n\n${trackList}`, songs.slice(0, 4).map((s, i) => ({
+            text: `▶ ${s.title?.slice(0, 15) || 'Play'}`,
+            id: `playtrack:${cacheIds[i]}`
+        })), { footer: '✨ OpenXX Music' });
+
+        return true;
+    }
+
+    // Handle track play from button
+    const trackPlayMatch = textMessage.trim().match(/^playtrack:(.+)$/i);
+    if (trackPlayMatch) {
+        const trackId = trackPlayMatch[1].trim();
+        const track = getCachedTrack(trackId);
+
+        if (!track) {
+            await waSock.sendMessage(from, { text: "⚠️ Track expired. Cari ulang dengan .spotify" }, { quoted: msg });
+            return true;
+        }
+
+        // Send searching message
+        const searchMsg = await waSock.sendMessage(from, { text: `🎵 Playing: ${track.title || track.name}...` });
+
+        try {
+            // Use preview_url directly
+            if (track.preview_url) {
+                const audioRes = await fetch(track.preview_url);
+                const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+
+                // Edit to show now playing with externalAdReply
+                if (track.cover) {
+                    await waSock.sendMessage(from, {
+                        text: '🎵 Now Playing',
+                        edit: searchMsg.key,
+                        externalAdReply: {
+                            title: track.title || track.name || 'Unknown',
+                            body: `${track.artists || 'Unknown'}${track.duration ? ` • ${track.duration}` : ''}`,
+                            thumbnail: { url: track.cover },
+                            largeThumbnail: true,
+                            sourceUrl: 'https://open.spotify.com'
+                        }
+                    });
+                } else {
+                    await waSock.sendMessage(from, {
+                        text: `🎵 *${track.title || track.name}*\n👤 ${track.artists || 'Unknown'}`,
+                        edit: searchMsg.key
+                    });
+                }
+
+                // Send audio
+                await waSock.sendMessage(from, {
+                    audio: audioBuffer,
+                    mimetype: 'audio/mpeg',
+                    ptt: false
+                }, { quoted: msg });
+            } else {
+                // Fallback: search and download
+                const dlResult = await downloadSong(track.title || track.name);
+                if (dlResult.ok && dlResult.downloadUrl) {
+                    const audioRes = await fetch(dlResult.downloadUrl);
+                    const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+                    await waSock.sendMessage(from, {
+                        text: `🎵 *${track.title || track.name}*`,
+                        edit: searchMsg.key
+                    });
+                    await waSock.sendMessage(from, { audio: audioBuffer, mimetype: 'audio/mpeg', ptt: false }, { quoted: msg });
+                }
+            }
+        } catch (e) {
+            await waSock.sendMessage(from, { text: `❌ Gagal play: ${e.message}` }, { quoted: msg });
+        }
+
+        return true;
+    }
 
         try {
             // Send audio
