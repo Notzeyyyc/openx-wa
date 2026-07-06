@@ -780,45 +780,6 @@ export async function handleCommands(from, textMessage, msg, waSock) {
         return true;
     }
 
-    // Spotify Search
-    const searchMatch = textMessage.trim().match(/^\.spotify\s+(.+)$/i);
-    if (searchMatch) {
-        const query = searchMatch[1].trim();
-        await waSock.sendMessage(from, { text: `🔍 Searching: ${query}...` }, { quoted: msg });
-
-        const result = await searchSongs(query, 5);
-
-        if (!result.ok) {
-            await waSock.sendMessage(from, { text: `❌ ${result.error}` }, { quoted: msg });
-            return true;
-        }
-
-        const songs = Array.isArray(result.results) ? result.results : [];
-        if (songs.length === 0) {
-            await waSock.sendMessage(from, { text: "🔍 Tidak ada hasil ditemukan." }, { quoted: msg });
-            return true;
-        }
-
-        // Cache results and get IDs
-        const cacheIds = cacheSearchResults(songs);
-
-        // Send as carousel with cover images + cached play buttons
-        const cards = songs.slice(0, 5).map((s, i) => ({
-            image: s.cover || undefined,
-            caption: `🎵 *${s.title || 'Unknown'}*\n👤 ${s.artists || 'Unknown'}${s.duration ? `\n⏱️ ${s.duration}` : ''}`,
-            footer: `${i + 1}/${songs.length}`,
-            buttons: [{ text: '▶ Play', id: `playtrack:${cacheIds[i]}` }]
-        }));
-
-        await sendCarousel(waSock, from, {
-            title: `🎵 Search: ${query}`,
-            footer: 'Tap Play untuk putar',
-            cards
-        });
-
-        return true;
-    }
-
     // Handle track play from carousel button
     const trackPlayMatch = textMessage.trim().match(/^playtrack:(.+)$/i);
     if (trackPlayMatch) {
