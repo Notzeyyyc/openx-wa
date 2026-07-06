@@ -9,7 +9,7 @@ import { askAI } from './ai-processor.js';
 import { stripMarkdown, saveLocalFile, getLocalFileById } from './helpers.js';
 import { handleCommands } from './commands.js';
 import { aiQueue, processQueue } from './queue.js';
-import { getGroup, checkSpam, checkAutoReply, isGroupApproved, getGroupDelay } from './group-manager.js';
+import { getGroup, checkSpam, checkAutoReply, isGroupApproved, getGroupDelay, setupGroupParticipants } from './group-manager.js';
 import { addGroupMember, removeGroupMember } from './group-training.js';
 import { trackMessage, trackCommand } from '../analytics.js';
 
