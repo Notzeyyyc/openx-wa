@@ -6,6 +6,7 @@ import {
 import { pendingSensitiveActions, executeSensitiveAction } from './sensitive-actions.js';
 import { cancelBgTask, getBgStatusText } from './queue.js';
 import { downloadSong, searchSongs, downloadByTrackUrl } from './music-handler.js';
+import { cacheSearchResults, getCachedTrack } from './track-cache.js';
 import { clearHistory } from './conversation-store.js';
 import { getRamReport, getRamTrend, forceGarbageCollect } from './ram-monitor.js';
 import { spawnAgent, getAgentsStatus } from './agent-manager.js';
@@ -670,19 +671,76 @@ export async function handleCommands(from, textMessage, msg, waSock) {
             return true;
         }
 
-        // Send as carousel with cover images
+        // Cache results and get IDs
+        const cacheIds = cacheSearchResults(songs);
+
+        // Send as carousel with cover images + cached play buttons
         const cards = songs.slice(0, 5).map((s, i) => ({
             image: s.cover || undefined,
             caption: `🎵 *${s.title || 'Unknown'}*\n👤 ${s.artists || 'Unknown'}${s.duration ? `\n⏱️ ${s.duration}` : ''}`,
             footer: `${i + 1}/${songs.length}`,
-            buttons: [{ text: 'Play', id: `.play ${s.title || ''}` }]
+            buttons: [{ text: '▶ Play', id: `playtrack:${cacheIds[i]}` }]
         }));
 
         await sendCarousel(waSock, from, {
             title: `🎵 Search: ${query}`,
-            footer: 'Spotify via Covenant',
+            footer: 'Tap Play untuk putar',
             cards
         });
+
+        return true;
+    }
+
+    // Handle track play from carousel button
+    const trackPlayMatch = textMessage.trim().match(/^playtrack:(.+)$/i);
+    if (trackPlayMatch) {
+        const trackId = trackPlayMatch[1].trim();
+        const track = getCachedTrack(trackId);
+
+        if (!track) {
+            await waSock.sendMessage(from, { text: "⚠️ Track expired. Cari ulang dengan .spotify" }, { quoted: msg });
+            return true;
+        }
+
+        await waSock.sendMessage(from, { text: `🎵 Playing: ${track.title || track.name}...` }, { quoted: msg });
+
+        // Use preview_url directly
+        if (track.preview_url) {
+            try {
+                const audioRes = await fetch(track.preview_url);
+                const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+
+                await waSock.sendMessage(from, {
+                    audio: audioBuffer,
+                    mimetype: 'audio/mpeg',
+                    ptt: false
+                }, { quoted: msg });
+
+                // Send info
+                if (track.cover) {
+                    await waSock.sendMessage(from, {
+                        image: { url: track.cover },
+                        caption: `🎵 *${track.title || track.name}*\n👤 ${track.artists || 'Unknown'}${track.duration ? `\n⏱️ ${track.duration}` : ''}`,
+                        footer: '✨ OpenXX Music'
+                    }, { quoted: msg });
+                } else {
+                    await waSock.sendMessage(from, {
+                        text: `🎵 *${track.title || track.name}*\n👤 ${track.artists || 'Unknown'}${track.duration ? `\n⏱️ ${track.duration}` : ''}`,
+                        footer: '✨ OpenXX Music'
+                    }, { quoted: msg });
+                }
+            } catch (e) {
+                await waSock.sendMessage(from, { text: `❌ Gagal play: ${e.message}` }, { quoted: msg });
+            }
+        } else {
+            // Fallback: search and download
+            const dlResult = await downloadSong(track.title || track.name);
+            if (dlResult.ok && dlResult.downloadUrl) {
+                const audioRes = await fetch(dlResult.downloadUrl);
+                const audioBuffer = Buffer.from(await audioRes.arrayBuffer());
+                await waSock.sendMessage(from, { audio: audioBuffer, mimetype: 'audio/mpeg', ptt: false }, { quoted: msg });
+            }
+        }
 
         return true;
     }
