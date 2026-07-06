@@ -9,7 +9,8 @@ import { askAI } from './ai-processor.js';
 import { stripMarkdown, saveLocalFile, getLocalFileById } from './helpers.js';
 import { handleCommands } from './commands.js';
 import { aiQueue, processQueue } from './queue.js';
-import { getGroup, checkSpam, checkAutoReply, setupGroupParticipants } from './group-manager.js';
+import { getGroup, checkSpam, checkAutoReply } from './group-manager.js';
+import { addGroupMember, removeGroupMember } from './group-training.js';
 import { trackMessage, trackCommand } from '../analytics.js';
 
 export function setupMessageHandler(waSock) {
@@ -242,6 +243,28 @@ export function setupMessageHandler(waSock) {
                     await waSock.sendMessage(from, { text: stripMarkdown(aiAnsw) || `Got it! File saved with ID: ${fileIdNum}` }, { quoted: msg });
                 } catch (err) {
                     await waSock.sendMessage(from, { text: `File saved! (ID: ${fileIdNum})` }, { quoted: msg });
+                }
+            }
+        } catch (err) {
+            logError(err);
+        }
+    });
+
+    // Track group participant changes
+    waSock.ev.on('group-participants.update', async (update) => {
+        try {
+            const { id, participants, action } = update;
+            
+            if (action === 'add') {
+                for (const participant of participants) {
+                    const name = participant.split('@')[0];
+                    addGroupMember(id, participant, name);
+                    logFn(`[Group] Member joined: ${name} in ${id}`);
+                }
+            } else if (action === 'remove') {
+                for (const participant of participants) {
+                    removeGroupMember(id, participant);
+                    logFn(`[Group] Member left: ${participant} from ${id}`);
                 }
             }
         } catch (err) {

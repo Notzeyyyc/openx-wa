@@ -5,7 +5,7 @@ import { loadJsonConfig } from '../config.js';
 import { getMainProvider, getMainModel } from '../ai-config.js';
 import { error as logError } from '../logger.js';
 import { loadHistory, saveMessage, getRecentMessages } from './conversation-store.js';
-
+import { getGroupContext } from './group-training.js';
 import { downloadMedia } from '../downloader.js';
 import { queueSensitiveAction, sendSensitiveConfirmationPrompt } from './sensitive-actions.js';
 import { waSock } from './connection.js';
@@ -107,7 +107,12 @@ Sebelum aksi sensitif, kasih [PRE_NOTIFY|pesan] dulu. Use 'none' jika Target WA 
     const activeProfile = personalities.profiles[personalities.active] || personalities.profiles["default"];
     const personalityPrompt = activeProfile ? activeProfile.prompt : "Lu adalah OPENX, asisten AI khusus buat pelajar.";
 
-    const systemPrompt = personalityPrompt + schedulesContext + storageContext + serverStatus + aiRules;
+    // Get group context if in a group
+    const isGroup = from?.endsWith('@g.us');
+    const groupContext = isGroup ? getGroupContext(from) : '';
+    const groupContextPrompt = groupContext ? `\n\nGroup Context:\n${groupContext}` : '';
+
+    const systemPrompt = personalityPrompt + schedulesContext + storageContext + serverStatus + groupContextPrompt + aiRules;
 
     // Load conversation history for context
     const history = from ? getRecentMessages(from, 10) : [];

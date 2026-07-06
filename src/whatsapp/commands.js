@@ -19,6 +19,7 @@ import { addNote, listNotes, deleteNote, searchNotes } from './notes.js';
 import { setReminder, listReminders, cancelReminder } from './reminders.js';
 import { sendVoiceNote, getVoiceList } from './voice-handler.js';
 import { getGroup, setGroup } from './group-manager.js';
+import { trainGroup, addGroupRule, removeGroupRule, addGroupTopic, getGroupContext, getGroupTraining, listGroups } from './group-training.js';
 
 const SENSITIVE_TTL_MS = 2 * 60 * 1000;
 
@@ -956,8 +957,73 @@ export async function handleCommands(from, textMessage, msg, waSock) {
             } else {
                 await waSock.sendMessage(from, { text: "❓ Usage: .group keyword add/remove/list <keyword>" }, { quoted: msg });
             }
+        } else if (sub === 'train') {
+            // Train group - fetch info and save
+            await waSock.sendMessage(from, { text: "🔄 Training group..." }, { quoted: msg });
+            const result = await trainGroup(waSock, from);
+            if (result.ok) {
+                const d = result.data;
+                const info = [
+                    `✅ *Group Trained!*`,
+                    `📝 Name: ${d.name}`,
+                    `👥 Members: ${d.memberCount}`,
+                    d.description ? `📄 Description: ${d.description.slice(0, 100)}` : '',
+                    d.members?.length > 0 ? `\n*Members:*\n${d.members.slice(0, 10).map(m => `• ${m.name}${m.isAdmin ? ' (admin)' : ''}`).join('\n')}` : ''
+                ].filter(Boolean).join('\n');
+                await waSock.sendMessage(from, { text: info }, { quoted: msg });
+            } else {
+                await waSock.sendMessage(from, { text: `❌ Training failed: ${result.error}` }, { quoted: msg });
+            }
+        } else if (sub === 'rule') {
+            const action = args[2]?.toLowerCase();
+            const ruleText = args.slice(3).join(' ').trim();
+            
+            if (action === 'add' && ruleText) {
+                addGroupRule(from, ruleText);
+                await waSock.sendMessage(from, { text: `✅ Rule added: ${ruleText}` }, { quoted: msg });
+            } else if (action === 'remove' && args[3]) {
+                const ok = removeGroupRule(from, args[3]);
+                await waSock.sendMessage(from, { text: ok ? `✅ Rule removed` : `❌ Rule not found` }, { quoted: msg });
+            } else if (action === 'list') {
+                const data = getGroupTraining(from);
+                const rules = data?.rules || [];
+                if (rules.length === 0) {
+                    await waSock.sendMessage(from, { text: "📋 Belum ada rules." }, { quoted: msg });
+                } else {
+                    const list = rules.map((r, i) => `${i + 1}. [${r.id}] ${r.text}`).join('\n');
+                    await waSock.sendMessage(from, { text: `📋 *Rules:*\n\n${list}` }, { quoted: msg });
+                }
+            } else {
+                await waSock.sendMessage(from, { text: "❓ Usage: .group rule add/remove/list <rule text>" }, { quoted: msg });
+            }
+        } else if (sub === 'topic') {
+            const action = args[2]?.toLowerCase();
+            const topic = args.slice(3).join(' ').trim();
+            
+            if (action === 'add' && topic) {
+                addGroupTopic(from, topic);
+                await waSock.sendMessage(from, { text: `✅ Topic added: ${topic}` }, { quoted: msg });
+            } else if (action === 'list') {
+                const data = getGroupTraining(from);
+                const topics = data?.topics || [];
+                if (topics.length === 0) {
+                    await waSock.sendMessage(from, { text: "📋 Belum ada topics." }, { quoted: msg });
+                } else {
+                    await waSock.sendMessage(from, { text: `📋 *Topics:*\n${topics.join(', ')}` }, { quoted: msg });
+                }
+            } else {
+                await waSock.sendMessage(from, { text: "❓ Usage: .group topic add/list <topic>" }, { quoted: msg });
+            }
+        } else if (sub === 'info') {
+            const data = getGroupTraining(from);
+            if (!data) {
+                await waSock.sendMessage(from, { text: "⚠️ Group belum di-train. Ketik `.group train` dulu." }, { quoted: msg });
+            } else {
+                const context = getGroupContext(from);
+                await waSock.sendMessage(from, { text: `📋 *Group Info:*\n\n${context}` }, { quoted: msg });
+            }
         } else {
-            await waSock.sendMessage(from, { text: "❓ *Group Commands:*\n.group settings\n.group welcome on/off/<msg>\n.group spam on/off\n.group reply on/off\n.group mute/unmute\n.group ai on/off\n.group keyword add/remove/list <kw>" }, { quoted: msg });
+            await waSock.sendMessage(from, { text: "❓ *Group Commands:*\n.group settings\n.group welcome on/off/<msg>\n.group spam on/off\n.group reply on/off\n.group mute/unmute\n.group ai on/off\n.group keyword add/remove/list\n.group train — train group info\n.group rule add/remove/list\n.group topic add/list\n.group info — view group context" }, { quoted: msg });
         }
         return true;
     }
