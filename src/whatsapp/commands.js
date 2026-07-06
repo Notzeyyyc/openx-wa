@@ -27,6 +27,7 @@ const SENSITIVE_TTL_MS = 2 * 60 * 1000;
 
 export async function handleCommands(from, textMessage, msg, waSock) {
     const lowerText = textMessage.trim().toLowerCase();
+    const isGroup = from.endsWith('@g.us');
 
     // File Management Commands
     if (/^(files|list files|daftar file|my files)$/i.test(textMessage.trim())) {
