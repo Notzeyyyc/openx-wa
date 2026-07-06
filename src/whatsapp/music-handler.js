@@ -25,36 +25,43 @@ export async function searchSongs(query, limit = 5) {
 }
 
 /**
- * Download song using preview_url directly
+ * Download song using Spotify URL
  */
 export async function downloadSong(query) {
     const apiKey = process.env.OPENX_SPOTIFY_API_KEY || '';
     if (!apiKey) return { ok: false, error: "Spotify API key not set" };
 
     try {
-        // Search to get song info + preview URL
+        // Search first to get song info
         const searchResult = await searchSongs(query, 1);
         if (!searchResult.ok || !searchResult.results?.[0]) {
             return { ok: false, error: 'Song not found' };
         }
 
         const song = searchResult.results[0];
+        const spotifyUrl = song.spotify_search_url || '';
 
-        // Use preview_url directly (Deezer CDN, reliable)
-        let audioUrl = song.preview_url;
+        // Download using Spotify URL
+        const downloadUrl = `${COVENANT_API}/download?q=${encodeURIComponent(query)}&url=${encodeURIComponent(spotifyUrl)}`;
+        const res = await fetch(downloadUrl, {
+            headers: { 'x-api-key': apiKey }
+        });
+        const data = await res.json();
 
-        // If no preview, try download endpoint with search URL
-        if (!audioUrl) {
-            const downloadUrl = `${COVENANT_API}/download?q=${encodeURIComponent(query)}&url=${encodeURIComponent(song.spotify_search_url || '')}`;
-            const res = await fetch(downloadUrl, {
-                headers: { 'x-api-key': apiKey }
-            });
-            const data = await res.json();
-            audioUrl = data.data?.audio_url;
-        }
-
-        if (!audioUrl) {
-            return { ok: false, error: 'No audio URL found' };
+        if (!data.status || !data.data?.audio_url) {
+            // Fallback to preview_url if download fails
+            if (song.preview_url) {
+                return {
+                    ok: true,
+                    title: song.title || query,
+                    artist: song.artists || 'Unknown',
+                    album: song.album || '',
+                    duration: song.duration || '',
+                    image: song.cover || '',
+                    downloadUrl: song.preview_url
+                };
+            }
+            return { ok: false, error: data.message || 'Download failed' };
         }
 
         return {
@@ -64,7 +71,7 @@ export async function downloadSong(query) {
             album: song.album || '',
             duration: song.duration || '',
             image: song.cover || '',
-            downloadUrl: audioUrl
+            downloadUrl: data.data.audio_url
         };
     } catch (e) {
         return { ok: false, error: e.message };
