@@ -9,9 +9,12 @@ import { askAI } from './ai-processor.js';
 import { stripMarkdown, saveLocalFile, getLocalFileById } from './helpers.js';
 import { handleCommands } from './commands.js';
 import { aiQueue, processQueue } from './queue.js';
-import { getGroup, checkSpam, checkAutoReply } from './group-manager.js';
+import { getGroup, checkSpam, checkAutoReply, isGroupApproved, getGroupDelay } from './group-manager.js';
 import { addGroupMember, removeGroupMember } from './group-training.js';
 import { trackMessage, trackCommand } from '../analytics.js';
+
+// Track last AI response time per group (for delay)
+const lastGroupResponse = new Map();
 
 export function setupMessageHandler(waSock) {
     logFn("[DEBUG] Message handler initialized");
@@ -84,6 +87,7 @@ export function setupMessageHandler(waSock) {
             const isMedia = msg.message.imageMessage || msg.message.documentMessage || msg.message.videoMessage || msg.message.audioMessage;
             const isGroup = from.endsWith('@g.us');
             const lowerText = textMessage ? textMessage.trim().toLowerCase() : '';
+            const senderName = msg.pushName || (participant ? participant.split('@')[0] : from.split('@')[0]);
 
             logFn(`[DEBUG] textMessage="${textMessage}", isMedia=${!!isMedia}, isGroup=${isGroup}`);
 
@@ -108,8 +112,29 @@ export function setupMessageHandler(waSock) {
                         return;
                     }
                 }
+
+                // Check if group is approved for AI chat
+                const approved = isGroupApproved(from);
+                if (approved && textMessage) {
+                    // Check delay
+                    const delay = getGroupDelay(from);
+                    const lastResponse = lastGroupResponse.get(from) || 0;
+                    const timeSinceLast = Date.now() - lastResponse;
+
+                    if (timeSinceLast < delay * 1000) {
+                        // Too soon, skip
+                        return;
+                    }
+
+                    // Queue AI response with delay
+                    lastGroupResponse.set(from, Date.now());
+                    aiQueue.push({ msg, textMessage: `${senderName} asked: ${textMessage}`, from, isComplex: false });
+                    processQueue(waSock, askAI, stripMarkdown);
+                    return;
+                }
+
                 // If AI not enabled in group, skip AI processing for non-prefix messages
-                if (!group?.ai_enabled && !lowerText.startsWith('.openx')) {
+                if (!group?.ai_enabled && !approved && !lowerText.startsWith('.openx')) {
                     // Allow commands but skip natural AI chat
                     if (!lowerText.startsWith('.group') && !lowerText.startsWith('.plugin') &&
                         !lowerText.startsWith('.play') && !lowerText.startsWith('.personality') &&

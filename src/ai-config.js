@@ -5,6 +5,7 @@ const CONFIG_PATH = './package/ai-config.json';
 
 const DEFAULT_CONFIG = {
     active: 'sumopod', // active profile name
+    agentic: false, // agentic mode
     profiles: {
         sumopod: { provider: 'openai', model: 'gpt-4o-mini', apiKey: '', baseUrl: 'https://ai.sumopod.com' },
         openrouter: { provider: 'openrouter', model: '', apiKey: '', baseUrl: '' },
@@ -210,4 +211,22 @@ export function setAgentConfig(agentType, profileName) {
     if (!cfg.agents[agentType]) cfg.agents[agentType] = {};
     cfg.agents[agentType].profile = profileName || '';
     saveConfig(cfg);
+}
+
+// Agentic mode
+export function isAgentic() {
+    return getConfig().agentic || false;
+}
+
+export function setAgentic(value) {
+    const cfg = getConfig();
+    cfg.agentic = value;
+    saveConfig(cfg);
+}
+
+export function toggleAgentic() {
+    const cfg = getConfig();
+    cfg.agentic = !cfg.agentic;
+    saveConfig(cfg);
+    return cfg.agentic;
 }

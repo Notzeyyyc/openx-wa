@@ -19,6 +19,37 @@ export function setGroup(jid, data) {
     return groups[jid];
 }
 
+/**
+ * Check if group is approved for AI chat
+ * Approved = AI can respond without prefix, with delay
+ */
+export function isGroupApproved(jid) {
+    const group = getGroup(jid);
+    return group?.ai_approved === true;
+}
+
+/**
+ * Set group approval status
+ */
+export function setGroupApproved(jid, approved) {
+    setGroup(jid, { ai_approved: approved });
+}
+
+/**
+ * Get group AI delay (seconds between responses)
+ */
+export function getGroupDelay(jid) {
+    const group = getGroup(jid);
+    return group?.ai_delay || 10; // default 10 seconds
+}
+
+/**
+ * Set group AI delay
+ */
+export function setGroupDelay(jid, seconds) {
+    setGroup(jid, { ai_delay: Math.max(5, Math.min(60, seconds)) });
+}
+
 export function checkSpam(jid, sender, text) {
     const key = `${jid}:${sender}`;
     const now = Date.now();

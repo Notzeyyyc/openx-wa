@@ -1,5 +1,5 @@
 import { config } from "./config.js";
-import { getMainApiKey } from "./ai-config.js";
+import { getMainApiKey, isAgentic } from "./ai-config.js";
 
 // Provider cache: name -> { complete, name }
 const providerCache = new Map();
@@ -48,24 +48,19 @@ async function loadProvider(name) {
 
 /**
  * Send messages to AI provider.
- *
- * @param {Array<{role: string, content: string}>} messages
- * @param {string|null} model - model override
- * @param {boolean} isComplex - complex mode flag
- * @param {string|null} userJid - user JID for session tracking
- * @param {string|null} providerOverride - force specific provider
- * @param {string|null} apiKeyOverride - force specific API key
- * @returns {Promise<string>}
  */
 export async function chatCompletion(messages, model = null, isComplex = false, userJid = null, providerOverride = null, apiKeyOverride = null) {
     const providerName = providerOverride || config.ai?.provider || "openrouter";
 
-    // Inject API key: override > ai-config > env
+    // Inject API key
     const apiKey = apiKeyOverride || getMainApiKey();
     if (apiKey && config.ai?.[providerName]) {
         config.ai[providerName].apiKey = apiKey;
     }
 
+    // Check if agentic mode is enabled
+    const agentic = isAgentic();
+
     const provider = await loadProvider(providerName);
-    return provider.complete(messages, model, isComplex, userJid);
+    return provider.complete(messages, model, isComplex || agentic, userJid);
 }

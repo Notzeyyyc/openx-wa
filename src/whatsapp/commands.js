@@ -12,7 +12,7 @@ import { cacheSearchResults, getCachedTrack } from './track-cache.js';
 import { clearHistory } from './conversation-store.js';
 import { getRamReport, getRamTrend, forceGarbageCollect } from './ram-monitor.js';
 import { spawnAgent, getAgentsStatus } from './agent-manager.js';
-import { getAIConfig, setMainProvider, setMainModel, setMainApiKey, setAgentApiKey, getAIStatus, getActiveProfileName, setActiveProfile, saveProfile, listProfiles, deleteProfile, setAgentProfile } from '../ai-config.js';
+import { getAIConfig, setMainProvider, setMainModel, setMainApiKey, setAgentApiKey, getAIStatus, getActiveProfileName, setActiveProfile, saveProfile, listProfiles, deleteProfile, setAgentProfile, isAgentic, setAgentic, toggleAgentic } from '../ai-config.js';
 import { log } from '../logger.js';
 import { getStatsSummary } from '../analytics.js';
 import { handlePluginCommand } from '../plugin-manager.mjs';
@@ -525,6 +525,52 @@ export async function handleCommands(from, textMessage, msg, waSock) {
                 ? stats.topCommands.map(([cmd, count]) => `${cmd}: ${count}`).join('\n')
                 : 'No commands used today');
         await waSock.sendMessage(from, { text: msg_text }, { quoted: msg });
+        return true;
+    }
+
+    // Agentic Mode Toggle
+    if (/^\.openx\s+agentic\s+(on|off)$/i.test(textMessage.trim())) {
+        const value = textMessage.trim().toLowerCase().includes('on');
+        setAgentic(value);
+        await waSock.sendMessage(from, { text: value ? '🤖 Agentic mode ON — AI can use tools automatically' : '🤖 Agentic mode OFF — AI responds normally' }, { quoted: msg });
+        return true;
+    }
+
+    if (/^\.openx\s+agentic$/i.test(textMessage.trim())) {
+        const current = isAgentic();
+        await waSock.sendMessage(from, { text: `🤖 Agentic mode: ${current ? 'ON' : 'OFF'}\n\nKetik .openx agentic on/off untuk toggle.` }, { quoted: msg });
+        return true;
+    }
+
+    // Group AI Approval
+    if (/^\.group\s+approve$/i.test(textMessage.trim())) {
+        if (!isGroup) {
+            await waSock.sendMessage(from, { text: "❌ Group commands only work in groups." }, { quoted: msg });
+            return true;
+        }
+        setGroupApproved(from, true);
+        await waSock.sendMessage(from, { text: "✅ AI approved for this group. AI will respond with 10-15s delay per chat." }, { quoted: msg });
+        return true;
+    }
+
+    if (/^\.group\s+unapprove$/i.test(textMessage.trim())) {
+        if (!isGroup) {
+            await waSock.sendMessage(from, { text: "❌ Group commands only work in groups." }, { quoted: msg });
+            return true;
+        }
+        setGroupApproved(from, false);
+        await waSock.sendMessage(from, { text: "❌ AI unapproved for this group. Use .openx <message> to chat." }, { quoted: msg });
+        return true;
+    }
+
+    if (/^\.group\s+delay\s+(\d+)$/i.test(textMessage.trim())) {
+        if (!isGroup) {
+            await waSock.sendMessage(from, { text: "❌ Group commands only work in groups." }, { quoted: msg });
+            return true;
+        }
+        const delay = parseInt(textMessage.trim().match(/\.group\s+delay\s+(\d+)/i)[1]);
+        setGroupDelay(from, delay);
+        await waSock.sendMessage(from, { text: `✅ AI delay set to ${delay} seconds` }, { quoted: msg });
         return true;
     }
 
@@ -1098,7 +1144,7 @@ export async function handleCommands(from, textMessage, msg, waSock) {
                 await waSock.sendMessage(from, { text: `📋 *Group Info:*\n\n${context}` }, { quoted: msg });
             }
         } else {
-            await waSock.sendMessage(from, { text: "❓ *Group Commands:*\n.group settings\n.group welcome on/off/<msg>\n.group spam on/off\n.group reply on/off\n.group mute/unmute\n.group ai on/off\n.group keyword add/remove/list\n.group train — train group info\n.group rule add/remove/list\n.group topic add/list\n.group info — view group context" }, { quoted: msg });
+            await waSock.sendMessage(from, { text: "❓ *Group Commands:*\n.group settings\n.group welcome on/off/<msg>\n.group spam on/off\n.group reply on/off\n.group mute/unmute\n.group ai on/off\n.group approve — AI auto-respond\n.group unapprove — disable AI\n.group delay <sec> — set response delay\n.group keyword add/remove/list\n.group train — train group info\n.group rule add/remove/list\n.group topic add/list\n.group info — view group context" }, { quoted: msg });
         }
         return true;
     }
