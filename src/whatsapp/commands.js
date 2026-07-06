@@ -1,7 +1,7 @@
 import fs from 'fs';
 import { loadJsonConfig, writeJsonConfig } from '../config.js';
 import {
-    listLocalFiles, deleteLocalFileById, renameLocalFileById
+    listLocalFiles, deleteLocalFileById, renameLocalFileById, fetchBuffer
 } from './helpers.js';
 import { pendingSensitiveActions, executeSensitiveAction } from './sensitive-actions.js';
 import { cancelBgTask, getBgStatusText } from './queue.js';
@@ -620,13 +620,14 @@ export async function handleCommands(from, textMessage, msg, waSock) {
         try {
             // Edit message to show playing status with externalAdReply
             if (result.image) {
+                const thumbnail = await fetchBuffer(result.image);
                 await waSock.sendMessage(from, {
                     text: `🎵 Now Playing`,
                     edit: searchMsg.key,
                     externalAdReply: {
                         title: result.title || 'Unknown',
                         body: `${result.artist || 'Unknown'}${result.album ? ` • ${result.album}` : ''}${result.duration ? ` • ${result.duration}` : ''}`,
-                        thumbnail: { url: result.image },
+                        thumbnail: thumbnail || undefined,
                         largeThumbnail: true,
                         sourceUrl: 'https://open.spotify.com'
                     }
@@ -683,13 +684,14 @@ export async function handleCommands(from, textMessage, msg, waSock) {
         // Edit message to show first result with externalAdReply
         const first = songs[0];
         if (first.cover) {
+            const thumbnail = await fetchBuffer(first.cover);
             await waSock.sendMessage(from, {
                 text: `🎵 Found ${songs.length} results`,
                 edit: searchMsg.key,
                 externalAdReply: {
                     title: first.title || 'Unknown',
                     body: `${first.artists || 'Unknown'}${first.duration ? ` • ${first.duration}` : ''}\nTap ▶ Play untuk putar`,
-                    thumbnail: { url: first.cover },
+                    thumbnail: thumbnail || undefined,
                     largeThumbnail: true,
                     sourceUrl: first.spotify_search_url || 'https://open.spotify.com'
                 }
@@ -736,13 +738,14 @@ export async function handleCommands(from, textMessage, msg, waSock) {
 
                 // Edit to show now playing with externalAdReply
                 if (track.cover) {
+                    const thumbnail = await fetchBuffer(track.cover);
                     await waSock.sendMessage(from, {
                         text: '🎵 Now Playing',
                         edit: searchMsg.key,
                         externalAdReply: {
                             title: track.title || track.name || 'Unknown',
                             body: `${track.artists || 'Unknown'}${track.duration ? ` • ${track.duration}` : ''}`,
-                            thumbnail: { url: track.cover },
+                            thumbnail: thumbnail || undefined,
                             largeThumbnail: true,
                             sourceUrl: 'https://open.spotify.com'
                         }

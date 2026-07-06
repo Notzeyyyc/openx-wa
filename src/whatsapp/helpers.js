@@ -1,6 +1,19 @@
 import fs from 'fs';
 import path from 'path';
 
+/**
+ * Fetch URL and return as Buffer
+ */
+export async function fetchBuffer(url) {
+    try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+        if (!res.ok) return null;
+        return Buffer.from(await res.arrayBuffer());
+    } catch {
+        return null;
+    }
+}
+
 export function stripMarkdown(text) {
     if (!text) return text;
     return text
