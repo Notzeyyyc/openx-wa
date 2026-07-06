@@ -3,6 +3,8 @@ import { loadJsonConfig, writeJsonConfig } from '../config.js';
 import {
     listLocalFiles, deleteLocalFileById, renameLocalFileById, fetchBuffer
 } from './helpers.js';
+import { webSearch } from './web-search.js';
+import { generateImage } from './image-gen.js';
 import { pendingSensitiveActions, executeSensitiveAction } from './sensitive-actions.js';
 import { cancelBgTask, getBgStatusText } from './queue.js';
 import { downloadSong, searchSongs, downloadByTrackUrl } from './music-handler.js';
@@ -200,6 +202,79 @@ export async function handleCommands(from, textMessage, msg, waSock) {
     if (/^(reset|clear|hapus memory| baru)$/i.test(textMessage.trim())) {
         clearHistory(from);
         await waSock.sendMessage(from, { text: "✅ Memory direset. Mulai percakapan baru!" }, { quoted: msg });
+        return true;
+    }
+
+    // Web Search
+    const searchCmdMatch = textMessage.trim().match(/^\.search\s+(.+)$/i);
+    if (searchCmdMatch) {
+        const query = searchCmdMatch[1].trim();
+        const searchMsg = await waSock.sendMessage(from, { text: `🔍 Searching: ${query}...` });
+
+        const result = await webSearch(query);
+
+        if (!result.ok) {
+            await waSock.sendMessage(from, { text: `❌ ${result.error}` }, { quoted: msg });
+            return true;
+        }
+
+        // Edit message with results
+        await waSock.sendMessage(from, {
+            text: `🔍 *Search: ${query}*\n\n${result.text}`,
+            edit: searchMsg.key,
+            footer: '✨ OpenXX Search'
+        });
+
+        return true;
+    }
+
+    // Image Generation
+    const imgGenMatch = textMessage.trim().match(/^\.img\s+(.+)$/i);
+    if (imgGenMatch) {
+        const prompt = imgGenMatch[1].trim();
+        const genMsg = await waSock.sendMessage(from, { text: `🎨 Generating image: ${prompt}...` });
+
+        const result = await generateImage(prompt);
+
+        if (!result.ok) {
+            await waSock.sendMessage(from, { text: `❌ ${result.error}` }, { quoted: msg });
+            return true;
+        }
+
+        // Send generated image
+        if (result.imageUrl) {
+            try {
+                const imageBuffer = await fetchBuffer(result.imageUrl);
+                if (imageBuffer) {
+                    await waSock.sendMessage(from, {
+                        image: imageBuffer,
+                        caption: `🎨 *${prompt}*${result.text ? `\n\n${result.text}` : ''}`,
+                        footer: '✨ OpenXX Image'
+                    });
+                } else {
+                    await waSock.sendMessage(from, {
+                        text: `🎨 *${prompt}*\n\n${result.text || 'Image generated but failed to download.'}\n\n🔗 ${result.imageUrl}`,
+                        footer: '✨ OpenXX Image'
+                    });
+                }
+            } catch (e) {
+                await waSock.sendMessage(from, {
+                    text: `🎨 *${prompt}*\n\n${result.text || ''}\n\n🔗 ${result.imageUrl}`,
+                    footer: '✨ OpenXX Image'
+                });
+            }
+        } else if (result.text) {
+            await waSock.sendMessage(from, {
+                text: `🎨 *${prompt}*\n\n${result.text}`,
+                footer: '✨ OpenXX Image'
+            });
+        }
+
+        // Delete generating message
+        try {
+            await waSock.sendMessage(from, { delete: genMsg.key });
+        } catch {}
+
         return true;
     }
 
