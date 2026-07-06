@@ -745,6 +745,79 @@ export async function handleCommands(from, textMessage, msg, waSock) {
         return true;
     }
 
+    // Album Command
+    const albumMatch = textMessage.trim().match(/^\.album\s+(.+)$/i);
+    if (albumMatch) {
+        const query = albumMatch[1].trim();
+        await waSock.sendMessage(from, { text: `💿 Searching album: ${query}...` }, { quoted: msg });
+
+        const result = await searchSongs(query, 10);
+
+        if (!result.ok) {
+            await waSock.sendMessage(from, { text: `❌ ${result.error}` }, { quoted: msg });
+            return true;
+        }
+
+        const songs = Array.isArray(result.results) ? result.results : [];
+        if (songs.length === 0) {
+            await waSock.sendMessage(from, { text: "💿 Album tidak ditemukan." }, { quoted: msg });
+            return true;
+        }
+
+        // Group by album
+        const albumMap = new Map();
+        for (const song of songs) {
+            const album = song.album || 'Unknown Album';
+            if (!albumMap.has(album)) {
+                albumMap.set(album, { cover: song.cover, tracks: [] });
+            }
+            albumMap.get(album).tracks.push(song);
+        }
+
+        // Send first album as album message
+        const [albumName, albumData] = albumMap.entries().next().value;
+
+        // Cache tracks
+        const cacheIds = cacheSearchResults(albumData.tracks);
+
+        // Build album message with cover
+        const trackList = albumData.tracks.map((t, i) => `${i + 1}. ${t.title || t.name} — ${t.artists || 'Unknown'} (${t.duration || ''})`).join('\n');
+
+        if (albumData.cover) {
+            // Send as album: cover image + track list
+            await waSock.sendMessage(from, {
+                album: [
+                    {
+                        image: { url: albumData.cover },
+                        caption: `💿 *${albumName}*\n👤 ${albumData.tracks[0]?.artists || 'Unknown'}\n🎵 ${albumData.tracks.length} tracks\n\n${trackList}`,
+                    },
+                    // Second image: all tracks as cards
+                    ...albumData.tracks.slice(0, 5).map((t, i) => ({
+                        image: { url: t.cover || albumData.cover },
+                        caption: `${i + 1}. ${t.title || t.name}\n⏱️ ${t.duration || ''}\nID: ${cacheIds[i]}`
+                    }))
+                ]
+            }, { quoted: msg });
+        } else {
+            // No cover: send as text
+            await waSock.sendMessage(from, {
+                text: `💿 *${albumName}*\n👤 ${albumData.tracks[0]?.artists || 'Unknown'}\n🎵 ${albumData.tracks.length} tracks\n\n${trackList}\n\nKetik \`.play <judul>\nuntuk putar.`,
+                footer: '✨ OpenXX Music'
+            }, { quoted: msg });
+        }
+
+        // If multiple albums, send info
+        if (albumMap.size > 1) {
+            const otherAlbums = [...albumMap.keys()].slice(1).join(', ');
+            await waSock.sendMessage(from, {
+                text: `💡 Album lain ditemukan: ${otherAlbums}\nKetik \`.album <nama album>\nuntuk lihat spesifik.`,
+                footer: '✨ OpenXX'
+            }, { quoted: msg });
+        }
+
+        return true;
+    }
+
     // Group Management Commands
     if (lowerText.startsWith('.group')) {
         const isGroup = from.endsWith('@g.us');
