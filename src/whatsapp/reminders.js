@@ -1,6 +1,9 @@
 import { loadJsonConfig, writeJsonConfig } from '../config.js';
 
-const REMINDERS_PATH = './package/reminders.json';
+import { DATA_DIR } from '../paths.js';
+import path from 'path';
+
+const REMINDERS_PATH = path.join(DATA_DIR, 'reminders.json');
 let checkInterval = null;
 
 function loadReminders() {

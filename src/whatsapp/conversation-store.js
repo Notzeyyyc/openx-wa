@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const CONV_DIR = "./package/conversations";
+import { CONV_DIR } from '../paths.js';
 const MAX_MESSAGES = 20; // keep last N messages per user
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min cache
 

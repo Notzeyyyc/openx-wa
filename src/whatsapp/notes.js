@@ -1,6 +1,9 @@
 import { loadJsonConfig, writeJsonConfig } from '../config.js';
 
-const NOTES_PATH = './package/notes.json';
+import { DATA_DIR } from '../paths.js';
+import path from 'path';
+
+const NOTES_PATH = path.join(DATA_DIR, 'notes.json');
 
 function loadNotes(chatId) {
     const all = loadJsonConfig(NOTES_PATH, {});

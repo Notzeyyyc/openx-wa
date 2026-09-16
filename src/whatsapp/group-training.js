@@ -1,8 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { loadJsonConfig, writeJsonConfig } from '../config.js';
+import { DATA_DIR } from '../paths.js';
 
-const GROUPS_DB_PATH = './package/groups-db.json';
+const GROUPS_DB_PATH = path.join(DATA_DIR, 'groups-db.json');
 
 /**
  * Load all groups data

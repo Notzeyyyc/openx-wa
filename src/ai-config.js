@@ -1,6 +1,8 @@
 import { loadJsonConfig, writeJsonConfig } from './config.js';
+import { DATA_DIR } from './paths.js';
+import path from 'path';
 
-const CONFIG_PATH = './package/ai-config.json';
+const CONFIG_PATH = path.join(DATA_DIR, 'ai-config.json');
 
 const DEFAULT_CONFIG = {
     active: 'sumopod',

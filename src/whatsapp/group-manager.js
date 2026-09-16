@@ -1,6 +1,9 @@
 import { loadJsonConfig, writeJsonConfig } from '../config.js';
 
-const GROUPS_FILE = './package/groups.json';
+import { DATA_DIR } from '../paths.js';
+import path from 'path';
+
+const GROUPS_FILE = path.join(DATA_DIR, 'groups.json');
 const messageTracker = new Map(); // key: jid:sender -> [{text, ts}]
 
 function loadGroups() {

@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { CACHE_DIR } from '../paths.js';
 
 /**
  * Fetch URL and return as Buffer
@@ -34,7 +35,7 @@ function generateFileId() {
 
 function ensureUserDir(chatId) {
     const cleanId = String(chatId).split('@')[0];
-    const dir = path.join("./caches/files", cleanId);
+    const dir = path.join(CACHE_DIR, "files", cleanId);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     return dir;
 }
@@ -57,7 +58,7 @@ export function saveLocalFile(chatId, buffer, filename) {
 }
 
 export function getLocalFileById(chatId, fileIdNum) {
-    const dir = path.join("./caches/files", String(chatId).split('@')[0]);
+    const dir = path.join(CACHE_DIR, "files", String(chatId).split('@')[0]);
     const metaPath = path.join(dir, "meta.json");
     try {
         const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
@@ -68,7 +69,7 @@ export function getLocalFileById(chatId, fileIdNum) {
 }
 
 function getLocalMeta(chatId) {
-    const dir = path.join("./caches/files", String(chatId).split('@')[0]);
+    const dir = path.join(CACHE_DIR, "files", String(chatId).split('@')[0]);
     const metaPath = path.join(dir, "meta.json");
     try {
         return JSON.parse(fs.readFileSync(metaPath, "utf-8"));
@@ -78,7 +79,7 @@ function getLocalMeta(chatId) {
 }
 
 function setLocalMeta(chatId, meta) {
-    const dir = path.join("./caches/files", String(chatId).split('@')[0]);
+    const dir = path.join(CACHE_DIR, "files", String(chatId).split('@')[0]);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     const metaPath = path.join(dir, "meta.json");
     fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2));

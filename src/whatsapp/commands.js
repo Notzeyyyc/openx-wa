@@ -1,5 +1,7 @@
 import fs from 'fs';
+import path from 'path';
 import { config, loadJsonConfig, writeJsonConfig } from '../config.js';
+import { DATA_DIR, ENV_FILE } from '../paths.js';
 import {
     fetchBuffer,
     listLocalFiles, deleteLocalFileById, renameLocalFileById
@@ -26,11 +28,11 @@ const reply = (ctx, text) => ctx.waSock.sendMessage(ctx.from, { text }, { quoted
 const replyErr = (ctx, err) => reply(ctx, `❌ ${err}`);
 const envSet = (key, value) => {
     let env = '';
-    try { env = fs.readFileSync('./.env', 'utf-8'); } catch {}
+    try { env = fs.readFileSync(ENV_FILE, 'utf-8'); } catch {}
     env = new RegExp(`^${key}=.*`, 'm').test(env)
         ? env.replace(new RegExp(`^${key}=.*`, 'm'), `${key}=${value}`)
         : env + `\n${key}=${value}\n`;
-    fs.writeFileSync('./.env', env);
+    fs.writeFileSync(ENV_FILE, env);
     process.env[key] = value;
 };
 
@@ -97,7 +99,7 @@ const COMMANDS = [
     admin: true,
     run: async (ctx) => {
         const sub = ctx.args[1]?.toLowerCase();
-        const modelData = loadJsonConfig("./package/model.json", { defaultModel: "", availableModels: [] });
+        const modelData = loadJsonConfig(path.join(DATA_DIR, "model.json"), { defaultModel: "", availableModels: [] });
 
         if (sub === 'list') {
             let listMsg = "🤖 *Available AI Models:*\n\n";
@@ -110,7 +112,7 @@ const COMMANDS = [
             const found = modelData.availableModels.find(m => m.toLowerCase() === newModel);
             if (!found) return replyErr(ctx, `Model *${newModel}* not found in list.`);
             modelData.defaultModel = found;
-            writeJsonConfig("./package/model.json", modelData);
+            writeJsonConfig(path.join(DATA_DIR, "model.json"), modelData);
             await reply(ctx, `✅ AI Model swapped to: *${found}*`);
         } else {
             await reply(ctx, "❓ *Model Commands:*\n.model list\n.model select [NAME]");

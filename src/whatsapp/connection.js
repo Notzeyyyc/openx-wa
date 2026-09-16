@@ -2,7 +2,9 @@ import { makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestWaWeb
 import pino from 'pino';
 import qrcode from 'qrcode-terminal';
 import fs from 'fs';
+import path from 'path';
 import { log, error as logError } from '../logger.js';
+import { DATA_DIR } from '../paths.js';
 import { askAI } from './ai-processor.js';
 import { stripMarkdown } from './helpers.js';
 import { setupMessageHandler } from './message-router.js';
@@ -52,7 +54,7 @@ export async function connectToWhatsApp() {
             if (autoPostInterval) clearInterval(autoPostInterval);
             autoPostInterval = setInterval(async () => {
                 let waConfig = { adminChannels: [] };
-                try { waConfig = JSON.parse(fs.readFileSync("./package/wa_config.json", "utf-8")); } catch(e) {}
+                try { waConfig = JSON.parse(fs.readFileSync(path.join(DATA_DIR, "wa_config.json"), "utf-8")); } catch(e) {}
                 
                 if (waConfig.adminChannels && waConfig.adminChannels.length > 0) {
                     for (const channelJid of waConfig.adminChannels) {

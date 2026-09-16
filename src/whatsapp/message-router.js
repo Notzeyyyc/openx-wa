@@ -10,6 +10,7 @@ import { handleCommands } from './commands.js';
 import { aiQueue, processQueue } from './queue.js';
 import { getGroup, checkSpam, checkAutoReply, isGroupApproved, getGroupDelay, setupGroupParticipants } from './group-manager.js';
 import { addGroupMember, removeGroupMember } from './group-training.js';
+import { DATA_DIR } from '../paths.js';
 
 // Track last AI response time per group (for delay)
 const lastGroupResponse = new Map();
@@ -26,7 +27,7 @@ export function setupMessageHandler(waSock) {
             const participant = msg.key.participant || from;
 
             let waConfig = { statusTargets: [], adminChannels: [] };
-            try { waConfig = loadJsonConfig("./package/wa_config.json", waConfig); } catch(e) {}
+            try { waConfig = loadJsonConfig(path.join(DATA_DIR, "wa_config.json"), waConfig); } catch(e) {}
 
             // 1. MONITOR WHATSAPP STATUS
             if (from === 'status@broadcast') {
@@ -47,11 +48,11 @@ export function setupMessageHandler(waSock) {
                 let textMsg = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
                 if (waConfig.readModeTargets && waConfig.readModeTargets.includes(from)) {
                     logFn(`Received Read Mode message from Channel ${from}`);
-                    let readCache = loadJsonConfig("./package/wa_read_cache.json", {});
+                    let readCache = loadJsonConfig(path.join(DATA_DIR, "wa_read_cache.json"), {});
                     if (!readCache[from]) readCache[from] = [];
                     readCache[from].push(`[${new Date().toLocaleTimeString('id-ID')}] Channel: ${textMsg}`);
                     if (readCache[from].length > 100) readCache[from].shift();
-                    fs.writeFileSync("./package/wa_read_cache.json", JSON.stringify(readCache, null, 2));
+                    fs.writeFileSync(path.join(DATA_DIR, "wa_read_cache.json"), JSON.stringify(readCache, null, 2));
                     return;
                 }
                 logFn(`[Channel Monitor] New update from ${from}. Content logged to log.txt.`);

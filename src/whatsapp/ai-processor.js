@@ -9,11 +9,12 @@ import { getGroupContext } from './group-training.js';
 import { downloadMedia } from '../downloader.js';
 import { queueSensitiveAction, sendSensitiveConfirmationPrompt } from './sensitive-actions.js';
 import { waSock } from './connection.js';
+import { DATA_DIR, LOG_FILE } from '../paths.js';
 
 let targetModel = "stepfun/step-3.5-flash:free";
 
 function getCurrentModel() {
-    const modelData = loadJsonConfig("./package/model.json", { defaultModel: targetModel });
+    const modelData = loadJsonConfig(path.join(DATA_DIR, "model.json"), { defaultModel: targetModel });
     return modelData.defaultModel;
 }
 
@@ -30,7 +31,7 @@ function buildStorageContext() {
 
     let storageContext = "";
     try {
-        const storageDir = "./package/storage";
+        const storageDir = path.join(DATA_DIR, "storage");
         if (fs.existsSync(storageDir)) {
             const files = fs.readdirSync(storageDir)
                 .map(name => {
@@ -63,7 +64,7 @@ function buildStorageContext() {
 function lastLogLines(n = 3) {
     // read only the tail of log.txt instead of the whole (ever-growing) file
     try {
-        const fd = fs.openSync("./log.txt", "r");
+        const fd = fs.openSync(LOG_FILE, "r");
         const size = fs.fstatSync(fd).size;
         const len = Math.min(size, 4096);
         const buf = Buffer.alloc(len);
@@ -80,13 +81,13 @@ function lastLogLines(n = 3) {
 export async function askAI(userMessage, from = null, isComplex = false) {
     let contextData = {};
     try {
-        contextData = loadJsonConfig("./package/context.json");
+        contextData = loadJsonConfig(path.join(DATA_DIR, "context.json"));
     } catch {}
     
     // Fetch school schedules and tasks info
     let schedulesContext = "";
     try {
-        const schedules = loadJsonConfig("./package/schedules.json", []);
+        const schedules = loadJsonConfig(path.join(DATA_DIR, "schedules.json"), []);
         if (schedules.length > 0) {
             schedulesContext = "\n\nSchedules/Tasks Info:\n" + schedules.map(s => `- ${s.day} ${s.time}: ${s.text}`).join("\n");
         }
@@ -110,7 +111,7 @@ Sebelum aksi sensitif, kasih [PRE_NOTIFY|pesan] dulu. Use 'none' jika Target WA 
     // Load personality settings
     let personalities = { active: "default", profiles: {} };
     try {
-        personalities = loadJsonConfig("./package/personalities.json");
+        personalities = loadJsonConfig(path.join(DATA_DIR, "personalities.json"));
     } catch (e) {}
     
     const activeProfile = personalities.profiles[personalities.active] || personalities.profiles["default"];
@@ -171,7 +172,7 @@ Sebelum aksi sensitif, kasih [PRE_NOTIFY|pesan] dulu. Use 'none' jika Target WA 
             let [hh, mm] = timeStr.split(':');
             if (hh && mm) {
                 let cronString = `${parseInt(mm)} ${parseInt(hh)} * * ${dayIdx}`;
-                const schedulePath = "./package/schedules.json";
+                const schedulePath = path.join(DATA_DIR, "schedules.json");
                 let schedules = [];
                 if (fs.existsSync(schedulePath)) schedules = JSON.parse(fs.readFileSync(schedulePath, "utf-8"));
                 
