@@ -2,14 +2,13 @@ import fs from 'fs';
 import path from 'path';
 import { chatCompletion } from '../provider.js';
 import { loadJsonConfig } from '../config.js';
-import { getActiveProfile, getMainModel, isAgentic } from '../ai-config.js';
+import { getActiveProfile, getMainModel } from '../ai-config.js';
 import { error as logError } from '../logger.js';
 import { saveMessage, getRecentMessages } from './conversation-store.js';
 import { getGroupContext } from './group-training.js';
 import { downloadMedia } from '../downloader.js';
 import { queueSensitiveAction, sendSensitiveConfirmationPrompt } from './sensitive-actions.js';
 import { waSock } from './connection.js';
-import { trackAIResponse } from '../analytics.js';
 
 let targetModel = "stepfun/step-3.5-flash:free";
 
@@ -138,7 +137,7 @@ Sebelum aksi sensitif, kasih [PRE_NOTIFY|pesan] dulu. Use 'none' jika Target WA 
 
     const startTime = Date.now();
     const model = getMainModel() || getCurrentModel();
-    let aiResult = await chatCompletion({ ...getActiveProfile(), model }, messages, isComplex || isAgentic()) || "";
+    let aiResult = await chatCompletion({ ...getActiveProfile(), model }, messages, isComplex) || "";
     const responseTimeMs = Date.now() - startTime;
     if (from) trackAIResponse(from, responseTimeMs, model);
     

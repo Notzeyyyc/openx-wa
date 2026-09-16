@@ -42,13 +42,9 @@ pm2 save && pm2 startup
 | `.note add <text>` | Save note |
 | `.note list` | List notes |
 | `.reminder <HH:MM> <text>` | Set reminder |
-| `.agent homework <task>` | Homework help |
-| `.agent essay <task>` | Essay writing |
-| `.agent solver <task>` | Math/science solver |
+| `.ai status` | Check config |
 | `.ai url <base-url>` | Set AI base URL |
 | `.ai apikey <key>` | Set API key |
-| `.ai status` | Check config |
-| `.stats` | View statistics |
 | `ram` | RAM usage |
 | `reset` | Clear memory |
 
@@ -72,13 +68,11 @@ openxx/
 │   ├── config.js         # Configuration
 │   ├── provider.js       # OpenAI-compatible chat API
 │   ├── ai-config.js      # AI profiles config
-│   ├── analytics.js      # Usage tracking
 │   └── whatsapp/
 │       ├── connection.js      # WhatsApp socket
 │       ├── message-router.js  # Message routing
 │       ├── ai-processor.js    # AI processing
 │       ├── commands.js        # Command handlers
-│       ├── agent-manager.js   # Subagent system
 │       ├── notes.js           # Notes feature
 │       ├── reminders.js       # Reminders feature
 │       ├── helpers.js         # Utilities

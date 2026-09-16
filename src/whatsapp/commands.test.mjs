@@ -31,7 +31,6 @@ test('dispatch: order + routing', async () => {
     assert.equal((await run('cancel confirm')).handled, true);
     assert.equal((await run('confirm:ABCD')).handled, true); // colon form
     assert.equal((await run('confirm ABCD')).handled, true); // space form
-    assert.equal((await run('.personality LIST')).handled, true); // case-insensitive sub
 });
 
 test('dispatch: group-only guard keeps approve priority', async () => {
@@ -42,7 +41,7 @@ test('dispatch: group-only guard keeps approve priority', async () => {
 });
 
 test('admin gate: privileged commands blocked for non-admin, allowed for admin', async () => {
-    for (const cmd of ['.ai status', '.note list', 'stats', '.reminder list', 'reset', '.group settings']) {
+    for (const cmd of ['.ai status', '.note list', '.reminder list', 'reset', '.group settings']) {
         const { handled, waSock } = await run(cmd, '628999@s.whatsapp.net');
         assert.equal(handled, true, `${cmd} should be handled (denied)`);
         assert.match(waSock.sent[0].content.text, /Khusus admin/, cmd);

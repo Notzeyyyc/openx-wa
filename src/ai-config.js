@@ -145,13 +145,3 @@ export function setAgentApiKey(agentType, apiKey) {
         saveConfig(cfg);
     }
 }
-
-export function isAgentic() {
-    return getConfig().agentic || false;
-}
-
-export function setAgentic(value) {
-    const cfg = getConfig();
-    cfg.agentic = value;
-    saveConfig(cfg);
-}

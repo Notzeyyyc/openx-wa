@@ -10,7 +10,6 @@ import { handleCommands } from './commands.js';
 import { aiQueue, processQueue } from './queue.js';
 import { getGroup, checkSpam, checkAutoReply, isGroupApproved, getGroupDelay, setupGroupParticipants } from './group-manager.js';
 import { addGroupMember, removeGroupMember } from './group-training.js';
-import { trackMessage, trackCommand } from '../analytics.js';
 
 // Track last AI response time per group (for delay)
 const lastGroupResponse = new Map();
@@ -82,9 +81,6 @@ export function setupMessageHandler(waSock) {
             const lowerText = textMessage ? textMessage.trim().toLowerCase() : '';
             const senderName = msg.pushName || (participant ? participant.split('@')[0] : from.split('@')[0]);
 
-            // Track incoming message
-            trackMessage(from, isGroup);
-
             // Group checks
             if (isGroup) {
                 const group = getGroup(from);
@@ -127,8 +123,8 @@ export function setupMessageHandler(waSock) {
                 // If AI not enabled in group, skip AI processing for non-prefix messages
                 if (!group?.ai_enabled && !approved && !lowerText.startsWith('.openx')) {
                     // Allow commands but skip natural AI chat
-                    if (!lowerText.startsWith('.group') && !lowerText.startsWith('.personality') &&
-                        !lowerText.startsWith('.model') && !lowerText.startsWith('.stats') &&
+                    if (!lowerText.startsWith('.group') &&
+                        !lowerText.startsWith('.model') &&
                         !lowerText.startsWith('reset') && !lowerText.startsWith('clear') &&
                         !lowerText.startsWith('ram') && !lowerText.startsWith('gc')) {
                         return;
@@ -173,7 +169,6 @@ export function setupMessageHandler(waSock) {
                 // Handle commands
                 const cmdHandled = await handleCommands(from, textMessage, msg, waSock);
                 if (cmdHandled) {
-                    trackCommand(from, textMessage.trim().split(/\s+/)[0]);
                     return;
                 }
 

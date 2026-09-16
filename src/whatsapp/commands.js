@@ -9,22 +9,17 @@ import { generateImage } from './image-gen.js';
 import { pendingSensitiveActions, executeSensitiveAction } from './sensitive-actions.js';
 import { clearHistory } from './conversation-store.js';
 import { getRamReport, getRamTrend, forceGarbageCollect } from './ram-monitor.js';
-import { spawnAgent, getAgentsStatus } from './agent-manager.js';
 import {
-    getMainModel, setMainModel, setMainApiKey, setMainBaseUrl, setAgentApiKey,
+    getMainModel, setMainModel, setMainApiKey, setMainBaseUrl,
     getAIStatus, getActiveProfileName, setActiveProfile, saveProfile,
-    listProfiles, deleteProfile, setAgentProfile, isAgentic, setAgentic
+    listProfiles, deleteProfile
 } from '../ai-config.js';
-import { getStatsSummary } from '../analytics.js';
-import { sendButtons, sendList } from './interactive.js';
 import { addNote, listNotes, deleteNote, searchNotes } from './notes.js';
 import { setReminder, listReminders, cancelReminder } from './reminders.js';
-import { sendVoiceNote, getVoiceList } from './voice-handler.js';
 import { getGroup, setGroup, setGroupApproved, setGroupDelay } from './group-manager.js';
 import { trainGroup, addGroupRule, removeGroupRule, addGroupTopic, getGroupContext, getGroupTraining } from './group-training.js';
 
 const SENSITIVE_TTL_MS = 2 * 60 * 1000;
-const AGENT_TYPES = ['research', 'code', 'translate', 'summary', 'homework', 'essay', 'solver', 'vision'];
 
 // --- tiny helpers shared by all handlers ---
 const reply = (ctx, text) => ctx.waSock.sendMessage(ctx.from, { text }, { quoted: ctx.msg });
@@ -95,48 +90,6 @@ const COMMANDS = [
         pendingSensitiveActions.delete(String(ctx.from));
         const execRes = await executeSensitiveAction(pending, ctx.from, ctx.waSock);
         await reply(ctx, execRes.ok ? `✅ ${execRes.text}` : `❌ ${execRes.text}`);
-    }
-},
-{
-    re: /^\.personality\b/i,
-    admin: true,
-    run: async (ctx) => {
-        const personalities = loadJsonConfig("./package/personalities.json", { active: "default", profiles: {} });
-        const save = () => writeJsonConfig("./package/personalities.json", personalities);
-        const sub = ctx.args[1]?.toLowerCase();
-
-        if (sub === 'list') {
-            let listMsg = "🎭 *Available Personalities:*\n\n";
-            for (const key in personalities.profiles) {
-                const p = personalities.profiles[key];
-                listMsg += `${key === personalities.active ? '✅' : '▪️'} *${key}*: ${p.name}\n`;
-            }
-            await reply(ctx, listMsg + "\nUse `.personality select [key]` to switch.");
-        } else if (sub === 'select') {
-            const key = ctx.args[2]?.toLowerCase();
-            if (!personalities.profiles[key]) return replyErr(ctx, `Personality *${key}* not found.`);
-            personalities.active = key;
-            save();
-            await reply(ctx, `✅ Personality swapped to: *${personalities.profiles[key].name}*`);
-        } else if (sub === 'add') {
-            const [name, ...promptParts] = ctx.text.slice('.personality add'.length).trim().split('|');
-            const prompt = promptParts.join('|').trim();
-            const key = name?.trim().toLowerCase().replace(/\s+/g, '_');
-            if (!key || !prompt) return reply(ctx, "❌ Format: `.personality add Name | Prompt Text`");
-            personalities.profiles[key] = { name: name.trim(), prompt };
-            save();
-            await reply(ctx, `✨ New personality added: *${name.trim()}* (key: ${key})`);
-        } else if (sub === 'delete') {
-            const key = ctx.args[2]?.toLowerCase();
-            if (key === 'default') return replyErr(ctx, "Cannot delete default personality.");
-            if (!personalities.profiles[key]) return replyErr(ctx, `Personality *${key}* not found.`);
-            delete personalities.profiles[key];
-            if (personalities.active === key) personalities.active = 'default';
-            save();
-            await reply(ctx, `🗑️ Personality *${key}* deleted.`);
-        } else {
-            await reply(ctx, "❓ *Personality Commands:*\n.personality list\n.personality select [key]\n.personality add [Name] | [Prompt]\n.personality delete [key]");
-        }
     }
 },
 {
@@ -239,20 +192,6 @@ const COMMANDS = [
     }
 },
 {
-    re: /^(stats|statistik|analytics)$/i,
-    admin: true,
-    run: async (ctx) => {
-        const s = getStatsSummary();
-        await reply(ctx, `📊 *Statistics (Today)*\n\n` +
-            `Messages: ${s.today.messages}\n` +
-            `AI Calls: ${s.today.aiCalls}\n` +
-            `Commands: ${s.today.commands}\n` +
-            `Avg Response: ${s.today.avgResponseTime}ms\n\n` +
-            `*Top Commands:*\n` +
-            (s.topCommands.length > 0 ? s.topCommands.map(([cmd, count]) => `${cmd}: ${count}`).join('\n') : 'No commands used today'));
-    }
-},
-{
     re: /^\.ai\b/i,
     admin: true,
     run: async (ctx) => {
@@ -306,21 +245,6 @@ const COMMANDS = [
             return reply(ctx, `✅ API Key set: ***${apiKey.slice(-4)}`);
         }
 
-        if (sub === 'agent') {
-            const [agentType, profileName] = ctx.args.slice(2);
-            if (!agentType || !profileName) return reply(ctx, `❓ Usage: .ai agent <type> <profile-name>\nTypes: ${AGENT_TYPES.join(', ')}`);
-            setAgentProfile(agentType, profileName);
-            return reply(ctx, `✅ Agent ${agentType} → profile: ${profileName}`);
-        }
-
-        if (sub === 'agentkey') {
-            const agentType = ctx.args[2];
-            const apiKey = ctx.args.slice(3).join(' ').trim();
-            if (!agentType || !apiKey) return reply(ctx, `❓ Usage: .ai agentkey <agent-type> <api-key>\nTypes: ${AGENT_TYPES.join(', ')}`);
-            setAgentApiKey(agentType, apiKey);
-            return reply(ctx, `✅ Agent ${agentType} API Key set: ***${apiKey.slice(-4)}`);
-        }
-
         if (sub === 'phone') {
             const phone = ctx.args[2];
             if (!phone) return reply(ctx, "❓ Usage: .ai phone <number>\nExample: .ai phone 628123456789");
@@ -328,57 +252,8 @@ const COMMANDS = [
             return reply(ctx, `✅ Phone number set to: ${phone}`);
         }
 
-        await reply(ctx, "❓ *AI Commands:*\n.ai status — lihat config\n.ai switch <name> — switch profile\n.ai save <name> — save current as profile\n.ai delete <name> — delete profile\n.ai url <base-url> — set API base URL (OpenAI-compatible)\n.ai model <name> — set model\n.ai apikey <key> — set API key\n.ai agent <type> <profile> — set agent profile");
+        await reply(ctx, "❓ *AI Commands:*\n.ai status — lihat config\n.ai switch <name> — switch profile\n.ai save <name> — save current as profile\n.ai delete <name> — delete profile\n.ai url <base-url> — set API base URL (OpenAI-compatible)\n.ai model <name> — set model\n.ai apikey <key> — set API key");
     }
-},
-{
-    re: /^\.agent\b/i,
-    admin: true,
-    run: async (ctx) => {
-        const sub = ctx.args[1]?.toLowerCase();
-
-        if (sub === 'status' || sub === 'list') return reply(ctx, `🤖 *Agents*\n\n${getAgentsStatus()}`);
-
-        if (!sub) {
-            return sendList(ctx.waSock, ctx.from, '🤖 *Select Agent*', 'Pilih agent untuk membantu task:', 'Pilih Agent', [
-                { title: '📚 Learning', rows: [
-                    { title: '📚 Homework', description: 'Bantu tugas sekolah', rowId: '.agent homework ' },
-                    { title: '✍️ Essay', description: 'Bantu karangan', rowId: '.agent essay ' },
-                    { title: '🧮 Solver', description: 'Selesaikan soal mat/fisika', rowId: '.agent solver ' }
-                ]},
-                { title: '💼 Productivity', rows: [
-                    { title: '🔍 Research', description: 'Riset mendalam', rowId: '.agent research ' },
-                    { title: '💻 Code', description: 'Tulis/debug kode', rowId: '.agent code ' },
-                    { title: '🌐 Translate', description: 'Terjemah teks', rowId: '.agent translate ' },
-                    { title: '📝 Summary', description: 'Rangkum teks panjang', rowId: '.agent summary ' }
-                ]},
-                { title: '👁️ Media', rows: [
-                    { title: '👁️ Vision', description: 'Analisis gambar', rowId: '.agent vision ' }
-                ]}
-            ]);
-        }
-
-        if (AGENT_TYPES.includes(sub)) {
-            const task = ctx.args.slice(2).join(' ').trim();
-            if (!task) return reply(ctx, `❓ Usage: .agent ${sub} <task>\nExample: .agent homework hitung 2+2`);
-            spawnAgent(sub, task, ctx.from, ctx.waSock);
-            return;
-        }
-
-        await reply(ctx, `❓ *Agent Commands:*\n` + AGENT_TYPES.map(t => `.agent ${t} <task>`).join('\n') + `\n.agent status`);
-    }
-},
-{
-    re: /^\.openx\s+agentic\s+(on|off)$/i,
-    run: async (ctx, m) => {
-        const on = m[1].toLowerCase() === 'on';
-        setAgentic(on);
-        await reply(ctx, on ? '🤖 Agentic mode ON — AI uses higher-effort responses' : '🤖 Agentic mode OFF — AI responds normally');
-    }
-},
-{
-    re: /^\.openx\s+agentic$/i,
-    run: async (ctx) => reply(ctx, `🤖 Agentic mode: ${isAgentic() ? 'ON' : 'OFF'}\n\nKetik .openx agentic on/off untuk toggle.`)
 },
 {
     re: /^\.group\s+approve$/i,
@@ -406,41 +281,6 @@ const COMMANDS = [
         const delay = parseInt(m[1]);
         setGroupDelay(ctx.from, delay);
         await reply(ctx, `✅ AI delay set to ${delay} seconds`);
-    }
-},
-{
-    re: /^\.voice\s+set\b/i,
-    admin: true,
-    run: async (ctx) => {
-        const voiceId = ctx.args[2];
-        if (!voiceId) return reply(ctx, "❓ Usage: .voice set <voice-id>\nKetik .voice list untuk melihat voice IDs");
-        envSet('OPENX_TTS_VOICE', voiceId);
-        await reply(ctx, `✅ Voice set to: ${voiceId}`);
-    }
-},
-{
-    re: /^\.voice\b/i,
-    run: async (ctx) => {
-        const sub = ctx.args[1]?.toLowerCase();
-
-        if (sub === 'list') {
-            const voices = await getVoiceList();
-            if (voices.length === 0) return reply(ctx, "⚠️ Tidak ada voice tersedia atau API key belum di-set.");
-            return reply(ctx, `🎤 *Available Voices*\n\n${voices.map(v => `• ${v.name} (${v.voice_id})`).join('\n')}`);
-        }
-
-        const text = ctx.args.slice(1).join(' ').trim();
-        if (!text) {
-            return sendButtons(ctx.waSock, ctx.from, '🎤 *Voice Note*', [
-                { id: '.voice list', text: '📋 List Voices' },
-                { id: '.voice set ', text: '⚙️ Set Voice' }
-            ], { footer: 'Atau ketik: .voice <text>' });
-        }
-
-        await reply(ctx, `🎤 Converting to voice...`);
-        if (!await sendVoiceNote(ctx.waSock, ctx.from, text, ctx.msg)) {
-            await reply(ctx, "⚠️ Gagal convert ke voice. Pastikan API key sudah di-set.");
-        }
     }
 },
 {
@@ -474,11 +314,7 @@ const COMMANDS = [
             return reply(ctx, ok ? `🗑️ Note ${noteId} deleted.` : `❌ Note ${noteId} not found.`);
         }
 
-        await sendButtons(ctx.waSock, ctx.from, '📝 *Note Commands*', [
-            { id: '.note list', text: '📋 List Notes' },
-            { id: '.note add ', text: '➕ Add Note' },
-            { id: '.note search ', text: '🔍 Search' }
-        ], { footer: 'Atau ketik .note <command>' });
+        await reply(ctx, "📝 *Note Commands:*\n\n.note list — Lihat semua catatan\n.note add <text> — Tambah catatan\n.note search <keyword> — Cari catatan");
     }
 },
 {
