@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert';
-import { buildChatUrl, buildModelsUrl } from './provider.js';
+import { buildChatUrl, buildModelsUrl, isAgentRouter, agentRouterHeaderOrder, CLIENT_HEADER_SETS } from './provider.js';
 
 test('buildChatUrl: host root', () => {
     assert.equal(buildChatUrl('https://ai.sumopod.com'), 'https://ai.sumopod.com/v1/chat/completions');
@@ -36,4 +36,26 @@ test('buildModelsUrl: groq /openai NOT stripped', () => {
 
 test('buildModelsUrl: opencode /inference (no /openai) idempotent', () => {
     assert.equal(buildModelsUrl('https://opencode.ai/inference'), 'https://opencode.ai/inference/v1/models');
+});
+
+test('isAgentRouter: matches agentrouter.org only', () => {
+    assert.equal(isAgentRouter('https://agentrouter.org/v1'), true);
+    assert.equal(isAgentRouter('https://agentrouter.org'), true);
+    assert.equal(isAgentRouter('https://opencode.ai/inference/openai'), false);
+    assert.equal(isAgentRouter('https://ai.sumopod.com'), false);
+});
+
+test('agentRouterHeaderOrder: codex first, roo fallback', () => {
+    assert.deepEqual(agentRouterHeaderOrder().map(s => s.name), ['codex', 'roo']);
+});
+
+test('agentRouterHeaderOrder: last-good set moves to front', () => {
+    assert.deepEqual(agentRouterHeaderOrder('roo').map(s => s.name), ['roo', 'codex']);
+});
+
+test('codex identity set carries required spoof headers', () => {
+    const codex = CLIENT_HEADER_SETS.find(s => s.name === 'codex');
+    assert.equal(codex.headers.Originator, 'codex_cli_rs');
+    assert.match(codex.headers['User-Agent'], /codex_cli_rs/);
+    assert.equal(codex.headers.Version, '0.101.0');
 });
