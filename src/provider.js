@@ -2,6 +2,11 @@ import { config } from './config.js';
 
 const REQUEST_TIMEOUT_MS = 55000;
 
+// OpenCode inference gateway: chat mounts at /inference/openai, models at /inference
+const MODELS_BASE_OVERRIDES = [
+    [/^https:\/\/opencode\.ai\/inference\/openai$/, 'https://opencode.ai/inference'],
+];
+
 /**
  * Build a /v1/chat/completions URL from any base URL.
  * Handles host root (https://host), host+/v1 (https://host/v1),
@@ -13,9 +18,12 @@ export function buildChatUrl(baseUrl) {
 
 /**
  * Build a /v1/models URL from any base URL (same normalization).
+ * Applies provider-specific overrides where models live at a different prefix.
  */
 export function buildModelsUrl(baseUrl) {
-    return `${baseUrl.replace(/\/+$/, '').replace(/\/v1$/, '')}/v1/models`;
+    let base = baseUrl.replace(/\/+$/, '').replace(/\/v1$/, '');
+    for (const [re, repl] of MODELS_BASE_OVERRIDES) base = base.replace(re, repl);
+    return `${base}/v1/models`;
 }
 
 /**
