@@ -1,9 +1,10 @@
 import fs from 'fs';
 import path from 'path';
+import { ENV_FILE } from './paths.js';
 
 function loadDotEnvIfPresent() {
     try {
-        process.loadEnvFile(path.resolve(process.cwd(), '.env'));
+        process.loadEnvFile(ENV_FILE);
     } catch {}
 }
 

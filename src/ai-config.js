@@ -1,26 +1,16 @@
 import { loadJsonConfig, writeJsonConfig } from './config.js';
+import { config } from './config.js';
 import { DATA_DIR } from './paths.js';
 import path from 'path';
 
 const CONFIG_PATH = path.join(DATA_DIR, 'ai-config.json');
 
 const DEFAULT_CONFIG = {
-    active: 'sumopod',
-    agentic: false,
+    active: 'default',
     profiles: {
-        sumopod: { baseUrl: 'https://ai.sumopod.com', apiKey: '', model: 'gpt-4o-mini' },
-        openrouter: { baseUrl: 'https://openrouter.ai/api/v1', apiKey: '', model: 'stepfun/step-3.5-flash:free' },
+        default: { baseUrl: config.ai.openai.baseUrl, apiKey: config.ai.openai.apiKey, model: config.ai.openai.model },
+        openrouter: { baseUrl: 'https://openrouter.ai/api', apiKey: '', model: 'deepseek/deepseek-chat' },
     },
-    agents: {
-        research: { profile: '' },
-        code: { profile: '' },
-        translate: { profile: '' },
-        summary: { profile: '' },
-        homework: { profile: '' },
-        essay: { profile: '' },
-        solver: { profile: '' },
-        vision: { profile: '' },
-    }
 };
 
 function getConfig() {
@@ -36,20 +26,11 @@ function saveConfig(cfg) {
 
 export function getActiveProfile() {
     const cfg = getConfig();
-    return cfg.profiles[cfg.active] || cfg.profiles.sumopod;
+    return cfg.profiles[cfg.active] || cfg.profiles.default;
 }
 
 export function getActiveProfileName() {
-    return getConfig().active || 'sumopod';
-}
-
-export function getAgentProfile(agentType) {
-    const cfg = getConfig();
-    const agentConf = cfg.agents[agentType];
-    if (agentConf?.profile && cfg.profiles[agentConf.profile]) {
-        return cfg.profiles[agentConf.profile];
-    }
-    return getActiveProfile();
+    return getConfig().active || 'default';
 }
 
 export function setActiveProfile(name) {
@@ -67,11 +48,11 @@ export function saveProfile(name, data = {}) {
 }
 
 export function deleteProfile(name) {
-    if (name === 'sumopod') return false;
+    if (name === 'default') return false;
     const cfg = getConfig();
     if (!cfg.profiles[name]) return false;
     delete cfg.profiles[name];
-    if (cfg.active === name) cfg.active = 'sumopod';
+    if (cfg.active === name) cfg.active = 'default';
     saveConfig(cfg);
     return true;
 }
@@ -83,13 +64,6 @@ export function listProfiles() {
         ...conf,
         active: name === cfg.active
     }));
-}
-
-export function setAgentProfile(agentType, profileName) {
-    const cfg = getConfig();
-    if (!cfg.agents[agentType]) cfg.agents[agentType] = {};
-    cfg.agents[agentType].profile = profileName || '';
-    saveConfig(cfg);
 }
 
 export function getAIStatus() {
@@ -104,12 +78,6 @@ export function getAIStatus() {
         const marker = name === cfg.active ? '✅' : '  ';
         const keyStatus = conf.apiKey ? '***' + conf.apiKey.slice(-4) : 'no key';
         lines.push(`${marker} ${name}: ${conf.baseUrl} ${conf.model || 'default'} (${keyStatus})`);
-    }
-    const overrides = Object.entries(cfg.agents).filter(([, conf]) => conf.profile);
-    if (overrides.length > 0) {
-        lines.push('');
-        lines.push('*Agent Overrides:*');
-        for (const [type, conf] of overrides) lines.push(`  ${type} → ${conf.profile}`);
     }
     return lines.join('\n');
 }
@@ -137,13 +105,4 @@ export function setMainBaseUrl(baseUrl) {
     const active = cfg.profiles[cfg.active];
     if (active) active.baseUrl = baseUrl;
     saveConfig(cfg);
-}
-
-export function setAgentApiKey(agentType, apiKey) {
-    const cfg = getConfig();
-    const agentProfile = cfg.agents[agentType]?.profile;
-    if (agentProfile && cfg.profiles[agentProfile]) {
-        cfg.profiles[agentProfile].apiKey = apiKey;
-        saveConfig(cfg);
-    }
 }
