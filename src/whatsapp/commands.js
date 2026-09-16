@@ -20,6 +20,7 @@ import { addNote, listNotes, deleteNote, searchNotes } from './notes.js';
 import { setReminder, listReminders, cancelReminder } from './reminders.js';
 import { getGroup, setGroup, setGroupApproved, setGroupDelay } from './group-manager.js';
 import { trainGroup, addGroupRule, removeGroupRule, addGroupTopic, getGroupContext, getGroupTraining } from './group-training.js';
+import { listModels, groupByFamily } from '../models.js';
 
 const SENSITIVE_TTL_MS = 2 * 60 * 1000;
 
@@ -254,7 +255,29 @@ const COMMANDS = [
             return reply(ctx, `✅ Phone number set to: ${phone}`);
         }
 
-        await reply(ctx, "❓ *AI Commands:*\n.ai status — lihat config\n.ai switch <name> — switch profile\n.ai save <name> — save current as profile\n.ai delete <name> — delete profile\n.ai url <base-url> — set API base URL (OpenAI-compatible)\n.ai model <name> — set model\n.ai apikey <key> — set API key");
+        if (sub === 'models') {
+            const filter = ctx.args[2]?.toLowerCase();
+            const profile = getActiveProfile();
+            const { ok, ids, error } = await listModels(profile);
+            if (!ok) return replyErr(ctx, `Gagal fetch models dari ${profile.baseUrl}: ${error}`);
+            const groups = groupByFamily(ids);
+            const filterFamilies = filter
+                ? Object.entries(groups).filter(([fam]) => fam.toLowerCase().includes(filter))
+                : Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
+            if (filterFamilies.length === 0) return reply(ctx, `🔍 Tidak ada provider/model yang cocok dengan "${filter}".`);
+            let msg = `🤖 *Models — ${getActiveProfileName()}*\n`;
+            msg += `Endpoint: ${profile.baseUrl}\n\n`;
+            for (const [fam, models] of filterFamilies) {
+                msg += `*${fam}* (${models.length})\n`;
+                for (const id of models) msg += `• ${id}\n`;
+                msg += `\n`;
+            }
+            msg += `Total: ${ids.length} model`;
+            if (ids.some(id => id.includes('free'))) msg += ` | 🆓 = gratis (hanya bisa dipakai dari dalam OpenCode app)`;
+            return reply(ctx, msg);
+        }
+
+        await reply(ctx, "❓ *AI Commands:*\n.ai status — lihat config\n.ai models [filter] — list models per provider\n.ai switch <name> — switch profile\n.ai save <name> — save current as profile\n.ai delete <name> — delete profile\n.ai url <base-url> — set API base URL (OpenAI-compatible)\n.ai model <name> — set model\n.ai apikey <key> — set API key");
     }
 },
 {

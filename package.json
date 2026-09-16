@@ -7,7 +7,7 @@
     "start": "node index.js",
     "setup": "node setup/index.js",
     "scan:secrets": "node scripts/scan-secrets.mjs",
-    "test": "pnpm run scan:secrets && node --test --test-force-exit src/whatsapp/commands.test.mjs src/provider.test.mjs"
+    "test": "pnpm run scan:secrets && node --test --test-force-exit src/whatsapp/commands.test.mjs src/provider.test.mjs src/models.test.mjs"
   },
   "keywords": [],
   "author": "",

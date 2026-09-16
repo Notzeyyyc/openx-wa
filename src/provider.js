@@ -12,6 +12,13 @@ export function buildChatUrl(baseUrl) {
 }
 
 /**
+ * Build a /v1/models URL from any base URL (same normalization).
+ */
+export function buildModelsUrl(baseUrl) {
+    return `${baseUrl.replace(/\/+$/, '').replace(/\/v1$/, '')}/v1/models`;
+}
+
+/**
  * Single OpenAI-compatible chat provider.
  * profile: { baseUrl, apiKey, model } — point baseUrl at any
  * /v1/chat/completions-compatible API (Zen, OpenRouter, SumoPod, etc).
