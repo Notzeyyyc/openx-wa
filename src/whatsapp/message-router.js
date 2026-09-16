@@ -127,12 +127,10 @@ export function setupMessageHandler(waSock) {
                 // If AI not enabled in group, skip AI processing for non-prefix messages
                 if (!group?.ai_enabled && !approved && !lowerText.startsWith('.openx')) {
                     // Allow commands but skip natural AI chat
-                    if (!lowerText.startsWith('.group') && !lowerText.startsWith('.plugin') &&
-                        !lowerText.startsWith('.play') && !lowerText.startsWith('.personality') &&
+                    if (!lowerText.startsWith('.group') && !lowerText.startsWith('.personality') &&
                         !lowerText.startsWith('.model') && !lowerText.startsWith('.stats') &&
                         !lowerText.startsWith('reset') && !lowerText.startsWith('clear') &&
-                        !lowerText.startsWith('ram') && !lowerText.startsWith('ping') &&
-                        !lowerText.startsWith('gc')) {
+                        !lowerText.startsWith('ram') && !lowerText.startsWith('gc')) {
                         return;
                     }
                 }

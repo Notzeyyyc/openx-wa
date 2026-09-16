@@ -51,10 +51,7 @@ export const initCommand = new Command('init')
       '',
       '# FGSi API (for .search and .img)',
       'OPENX_FGSI_BASE_URL=https://fgsi.dpdns.org/api/ai/claude',
-      'OPENX_FGSI_API_KEY=',
-      '',
-      '# Spotify (via Covenant API)',
-      'OPENX_SPOTIFY_API_KEY='
+      'OPENX_FGSI_API_KEY='
     ];
 
     fs.writeFileSync(path.resolve(process.cwd(), '.env'), envLines.join('\n') + '\n');

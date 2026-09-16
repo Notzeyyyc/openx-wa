@@ -7,8 +7,6 @@ import {
 import { webSearch } from './web-search.js';
 import { generateImage } from './image-gen.js';
 import { pendingSensitiveActions, executeSensitiveAction } from './sensitive-actions.js';
-import { downloadSong, searchSongs, downloadByTrackUrl } from './music-handler.js';
-import { cacheSearchResults, getCachedTrack } from './track-cache.js';
 import { clearHistory } from './conversation-store.js';
 import { getRamReport, getRamTrend, forceGarbageCollect } from './ram-monitor.js';
 import { spawnAgent, getAgentsStatus } from './agent-manager.js';
@@ -40,30 +38,6 @@ const envSet = (key, value) => {
     fs.writeFileSync('./.env', env);
     process.env[key] = value;
 };
-
-async function editNowPlaying(ctx, searchMsg, { title, body, cover, sourceUrl, plainText }) {
-    if (cover) {
-        const thumbnail = await fetchBuffer(cover);
-        await ctx.waSock.sendMessage(ctx.from, {
-            text: title,
-            edit: searchMsg.key,
-            externalAdReply: {
-                title: plainText.title, body: plainText.body,
-                thumbnail: thumbnail || undefined,
-                largeThumbnail: true,
-                sourceUrl: sourceUrl || 'https://open.spotify.com'
-            }
-        });
-    } else {
-        await ctx.waSock.sendMessage(ctx.from, { text: `🎵 *${plainText.title}*\n👤 ${plainText.body}`, edit: searchMsg.key });
-    }
-}
-
-async function sendAudioUrl(ctx, url) {
-    const res = await fetch(url);
-    const buffer = Buffer.from(await res.arrayBuffer());
-    await ctx.waSock.sendMessage(ctx.from, { audio: buffer, mimetype: 'audio/mpeg', ptt: false }, { quoted: ctx.msg });
-}
 
 // --- command handlers (ordered; first regex match wins) ---
 const COMMANDS = [
@@ -530,128 +504,6 @@ const COMMANDS = [
         if (!/^\d{2}:\d{2}$/.test(sub)) return replyErr(ctx, "Format waktu harus HH:MM (contoh: 14:30)");
         const reminder = setReminder(ctx.from, sub, text);
         await reply(ctx, `⏰ Reminder set: ${sub}\n\n${text}\n\n(ID: ${reminder.id})`);
-    }
-},
-{
-    re: /^\.play\s+(.+)$/i,
-    run: async (ctx, m) => {
-        const input = m[1].trim();
-        const searchMsg = await ctx.waSock.sendMessage(ctx.from, { text: `🔍 Searching: ${input}...` });
-        const isUrl = input.startsWith('http://') || input.startsWith('https://');
-        const result = isUrl ? await downloadByTrackUrl(input) : await downloadSong(input);
-        if (!result.ok) return replyErr(ctx, result.error);
-
-        try {
-            await editNowPlaying(ctx, searchMsg, {
-                title: '🎵 Now Playing',
-                cover: result.image,
-                plainText: { title: result.title || 'Unknown', body: `${result.artist || 'Unknown'}${result.album ? ` • ${result.album}` : ''}${result.duration ? ` • ${result.duration}` : ''}` }
-            });
-            if (result.downloadUrl) await sendAudioUrl(ctx, result.downloadUrl);
-        } catch (e) {
-            await replyErr(ctx, `Gagal play: ${e.message}`);
-        }
-    }
-},
-{
-    re: /^\.spotify\s+(.+)$/i,
-    run: async (ctx, m) => {
-        const query = m[1].trim();
-        const searchMsg = await ctx.waSock.sendMessage(ctx.from, { text: `🔍 Searching: ${query}...` });
-        const result = await searchSongs(query, 5);
-        if (!result.ok) return replyErr(ctx, result.error);
-
-        const songs = Array.isArray(result.results) ? result.results : [];
-        if (songs.length === 0) return reply(ctx, "🔍 Tidak ada hasil ditemukan.");
-
-        const cacheIds = cacheSearchResults(songs);
-        const first = songs[0];
-        await editNowPlaying(ctx, searchMsg, {
-            title: `🎵 Found ${songs.length} results`,
-            cover: first.cover,
-            sourceUrl: first.spotify_search_url,
-            plainText: { title: first.title || 'Unknown', body: `${first.artists || 'Unknown'}${first.duration ? ` • ${first.duration}` : ''}\nTap ▶ Play untuk putar` }
-        });
-
-        const trackList = songs.map((s, i) => `${i + 1}. ${s.title || 'Unknown'} — ${s.artists || 'Unknown'} (${s.duration || ''})`).join('\n');
-        await sendButtons(ctx.waSock, ctx.from, `🎵 *Search Results*\n\n${trackList}`, songs.slice(0, 4).map((s, i) => ({
-            text: `▶ ${s.title?.slice(0, 15) || 'Play'}`,
-            id: `playtrack:${cacheIds[i]}`
-        })), { footer: '✨ OpenXX Music' });
-    }
-},
-{
-    re: /^playtrack:(.+)$/i,
-    run: async (ctx, m) => {
-        const track = getCachedTrack(m[1].trim());
-        if (!track) return reply(ctx, "⚠️ Track expired. Cari ulang dengan .spotify");
-
-        const title = track.title || track.name;
-        const searchMsg = await ctx.waSock.sendMessage(ctx.from, { text: `🎵 Playing: ${title}...` });
-
-        try {
-            if (track.preview_url) {
-                await editNowPlaying(ctx, searchMsg, {
-                    title: '🎵 Now Playing',
-                    cover: track.cover,
-                    plainText: { title: title || 'Unknown', body: `${track.artists || 'Unknown'}${track.duration ? ` • ${track.duration}` : ''}` }
-                });
-                await sendAudioUrl(ctx, track.preview_url);
-            } else {
-                const dl = await downloadSong(title);
-                if (dl.ok && dl.downloadUrl) {
-                    await ctx.waSock.sendMessage(ctx.from, { text: `🎵 *${title}*`, edit: searchMsg.key });
-                    await sendAudioUrl(ctx, dl.downloadUrl);
-                }
-            }
-        } catch (e) {
-            await replyErr(ctx, `Gagal play: ${e.message}`);
-        }
-    }
-},
-{
-    re: /^\.album\s+(.+)$/i,
-    run: async (ctx, m) => {
-        const query = m[1].trim();
-        await reply(ctx, `💿 Searching album: ${query}...`);
-        const result = await searchSongs(query, 10);
-        if (!result.ok) return replyErr(ctx, result.error);
-
-        const songs = Array.isArray(result.results) ? result.results : [];
-        if (songs.length === 0) return reply(ctx, "💿 Album tidak ditemukan.");
-
-        const albumMap = new Map();
-        for (const song of songs) {
-            const album = song.album || 'Unknown Album';
-            if (!albumMap.has(album)) albumMap.set(album, { cover: song.cover, tracks: [] });
-            albumMap.get(album).tracks.push(song);
-        }
-
-        const [albumName, albumData] = albumMap.entries().next().value;
-        const cacheIds = cacheSearchResults(albumData.tracks);
-        const trackList = albumData.tracks.map((t, i) => `${i + 1}. ${t.title || t.name} — ${t.artists || 'Unknown'} (${t.duration || ''})`).join('\n');
-        const header = `💿 *${albumName}*\n👤 ${albumData.tracks[0]?.artists || 'Unknown'}\n🎵 ${albumData.tracks.length} tracks`;
-
-        if (albumData.cover) {
-            await ctx.waSock.sendMessage(ctx.from, {
-                album: [
-                    { image: { url: albumData.cover }, caption: `${header}\n\n${trackList}` },
-                    ...albumData.tracks.slice(0, 5).map((t, i) => ({
-                        image: { url: t.cover || albumData.cover },
-                        caption: `${i + 1}. ${t.title || t.name}\n⏱️ ${t.duration || ''}\nID: ${cacheIds[i]}`
-                    }))
-                ]
-            }, { quoted: ctx.msg });
-        } else {
-            await ctx.waSock.sendMessage(ctx.from, {
-                text: `${header}\n\n${trackList}\n\nKetik \`.play <judul>\` untuk putar.`,
-                footer: '✨ OpenXX Music'
-            }, { quoted: ctx.msg });
-        }
-
-        if (albumMap.size > 1) {
-            await reply(ctx, `💡 Album lain ditemukan: ${[...albumMap.keys()].slice(1).join(', ')}\nKetik \`.album <nama album>\` untuk lihat spesifik.`);
-        }
     }
 },
 {

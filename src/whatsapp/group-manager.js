@@ -71,7 +71,7 @@ export function checkSpam(jid, sender, text) {
 }
 
 const autoReplies = {
-    'menu': '📋 Menu:\n1. Play music\n2. AI chat\n3. Help',
+    'menu': '📋 Menu:\n1. AI chat\n2. Notes\n3. Help',
     'help': 'Ketik .openx <pertanyaan> untuk chat AI',
     'ping': 'Pong! 🏓'
 };

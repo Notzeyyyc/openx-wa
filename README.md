@@ -8,7 +8,6 @@ WhatsApp AI productivity assistant. Belajar, kerja, dan produktivitas — semua 
 - **Agents** — Homework, Essay, Solver, Research, Translate, Vision
 - **Notes** — Simpan catatan via WhatsApp
 - **Reminders** — Set pengingat via WhatsApp
-- **Music Player** — `.play <lagu>`
 - **Group Management** — Auto-welcome, anti-spam, auto-reply
 - **Analytics** — Track usage statistics
 - **Conversation Memory** — AI ingat percakapan sebelumnya
@@ -40,7 +39,6 @@ pm2 save && pm2 startup
 
 | Command | Description |
 |---------|-------------|
-| `.play <lagu>` | Play music |
 | `.note add <text>` | Save note |
 | `.note list` | List notes |
 | `.reminder <HH:MM> <text>` | Set reminder |
@@ -83,7 +81,6 @@ openxx/
 │       ├── agent-manager.js   # Subagent system
 │       ├── notes.js           # Notes feature
 │       ├── reminders.js       # Reminders feature
-│       ├── music-handler.js   # Music player
 │       ├── helpers.js         # Utilities
 │       ├── queue.js           # Message queue
 │       └── conversation-store.js
