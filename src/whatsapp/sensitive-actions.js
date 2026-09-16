@@ -1,8 +1,9 @@
+import crypto from 'crypto';
+
 export const pendingSensitiveActions = new Map();
-const SENSITIVE_TTL_MS = 2 * 60 * 1000;
 
 function createSensitiveToken() {
-    return Math.random().toString(36).slice(2, 8).toUpperCase();
+    return crypto.randomBytes(4).toString('hex').toUpperCase();
 }
 
 export function queueSensitiveAction(chatId, actionType, payload, summary) {
@@ -38,13 +39,6 @@ export async function sendSensitiveConfirmationPrompt(waSock, jid, title, token)
 export async function executeSensitiveAction(pending, from, waSock) {
     if (!pending) return { ok: false, text: "Aksi tidak ditemukan." };
     try {
-        if (pending.actionType === 'server_restart') {
-            if (from && waSock) {
-                await waSock.sendMessage(from, { text: "♻️ Restart server dalam 2 detik..." }).catch(() => {});
-            }
-            setTimeout(() => process.exit(1), 2000);
-            return { ok: true, text: "Restart dijadwalkan." };
-        }
         if (pending.actionType === 'wa_send') {
             const list = pending.payload?.messages || [];
             let sent = 0;

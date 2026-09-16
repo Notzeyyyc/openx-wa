@@ -11,5 +11,11 @@ package/schedules.json
 package/storage/*
 !package/storage/.gitkeep
 package/conversations/
+package/ai-config.json
+package/reminders.json
+package/notes.json
+package/groups.json
+package/groups-db.json
+package/analytics.jsonl
 
 

@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { loadJsonConfig, writeJsonConfig } from '../config.js';
+import { config, loadJsonConfig, writeJsonConfig } from '../config.js';
 import {
     fetchBuffer,
     listLocalFiles, deleteLocalFileById, renameLocalFileById
@@ -125,6 +125,7 @@ const COMMANDS = [
 },
 {
     re: /^\.personality\b/i,
+    admin: true,
     run: async (ctx) => {
         const personalities = loadJsonConfig("./package/personalities.json", { active: "default", profiles: {} });
         const save = () => writeJsonConfig("./package/personalities.json", personalities);
@@ -166,6 +167,7 @@ const COMMANDS = [
 },
 {
     re: /^\.model\b/i,
+    admin: true,
     run: async (ctx) => {
         const sub = ctx.args[1]?.toLowerCase();
         const modelData = loadJsonConfig("./package/model.json", { defaultModel: "", availableModels: [] });
@@ -190,6 +192,7 @@ const COMMANDS = [
 },
 {
     re: /^(reset|clear|hapus memory|baru)$/i,
+    admin: true,
     run: async (ctx) => {
         clearHistory(ctx.from);
         await reply(ctx, "✅ Memory direset. Mulai percakapan baru!");
@@ -253,6 +256,7 @@ const COMMANDS = [
 },
 {
     re: /^(gc|garbage collect|bersihkan memory)$/i,
+    admin: true,
     run: async (ctx) => {
         const before = process.memoryUsage().heapUsed;
         if (!forceGarbageCollect()) return reply(ctx, "⚠️ GC tidak tersedia (jalankan dengan --expose-gc)");
@@ -262,6 +266,7 @@ const COMMANDS = [
 },
 {
     re: /^(stats|statistik|analytics)$/i,
+    admin: true,
     run: async (ctx) => {
         const s = getStatsSummary();
         await reply(ctx, `📊 *Statistics (Today)*\n\n` +
@@ -275,6 +280,7 @@ const COMMANDS = [
 },
 {
     re: /^\.ai\b/i,
+    admin: true,
     run: async (ctx) => {
         const sub = ctx.args[1]?.toLowerCase();
 
@@ -353,6 +359,7 @@ const COMMANDS = [
 },
 {
     re: /^\.agent\b/i,
+    admin: true,
     run: async (ctx) => {
         const sub = ctx.args[1]?.toLowerCase();
 
@@ -401,6 +408,7 @@ const COMMANDS = [
 },
 {
     re: /^\.group\s+approve$/i,
+    admin: true,
     run: async (ctx) => {
         if (!ctx.isGroup) return replyErr(ctx, "Group commands only work in groups.");
         setGroupApproved(ctx.from, true);
@@ -409,6 +417,7 @@ const COMMANDS = [
 },
 {
     re: /^\.group\s+unapprove$/i,
+    admin: true,
     run: async (ctx) => {
         if (!ctx.isGroup) return replyErr(ctx, "Group commands only work in groups.");
         setGroupApproved(ctx.from, false);
@@ -417,11 +426,22 @@ const COMMANDS = [
 },
 {
     re: /^\.group\s+delay\s+(\d+)$/i,
+    admin: true,
     run: async (ctx, m) => {
         if (!ctx.isGroup) return replyErr(ctx, "Group commands only work in groups.");
         const delay = parseInt(m[1]);
         setGroupDelay(ctx.from, delay);
         await reply(ctx, `✅ AI delay set to ${delay} seconds`);
+    }
+},
+{
+    re: /^\.voice\s+set\b/i,
+    admin: true,
+    run: async (ctx) => {
+        const voiceId = ctx.args[2];
+        if (!voiceId) return reply(ctx, "❓ Usage: .voice set <voice-id>\nKetik .voice list untuk melihat voice IDs");
+        envSet('OPENX_TTS_VOICE', voiceId);
+        await reply(ctx, `✅ Voice set to: ${voiceId}`);
     }
 },
 {
@@ -433,13 +453,6 @@ const COMMANDS = [
             const voices = await getVoiceList();
             if (voices.length === 0) return reply(ctx, "⚠️ Tidak ada voice tersedia atau API key belum di-set.");
             return reply(ctx, `🎤 *Available Voices*\n\n${voices.map(v => `• ${v.name} (${v.voice_id})`).join('\n')}`);
-        }
-
-        if (sub === 'set') {
-            const voiceId = ctx.args[2];
-            if (!voiceId) return reply(ctx, "❓ Usage: .voice set <voice-id>\nKetik .voice list untuk melihat voice IDs");
-            envSet('OPENX_TTS_VOICE', voiceId);
-            return reply(ctx, `✅ Voice set to: ${voiceId}`);
         }
 
         const text = ctx.args.slice(1).join(' ').trim();
@@ -458,6 +471,7 @@ const COMMANDS = [
 },
 {
     re: /^\.note\b/i,
+    admin: true,
     run: async (ctx) => {
         const sub = ctx.args[1]?.toLowerCase();
 
@@ -495,6 +509,7 @@ const COMMANDS = [
 },
 {
     re: /^\.reminder\b/i,
+    admin: true,
     run: async (ctx) => {
         const sub = ctx.args[1]?.toLowerCase();
 
@@ -641,6 +656,7 @@ const COMMANDS = [
 },
 {
     re: /^\.group\b/i,
+    admin: true,
     run: async (ctx) => {
         if (!ctx.isGroup) return replyErr(ctx, "Group commands only work in groups.");
 
@@ -760,17 +776,29 @@ const COMMANDS = [
 },
 ];
 
+function adminJid() {
+    const raw = config.devPhoneNumber || '';
+    if (!raw) return null;
+    return (raw.includes('@') ? raw : `${raw}@s.whatsapp.net`).split(':')[0];
+}
+
 export async function handleCommands(from, textMessage, msg, waSock) {
     const text = textMessage.trim().replace(/\s+/g, ' ');
+    const sender = String(msg.key?.participant || from).split(':')[0];
     const ctx = {
         from, msg, waSock, text,
         args: text.split(' '),
         isGroup: from.endsWith('@g.us'),
+        isAdmin: !!adminJid() && sender === adminJid(),
     };
 
     for (const cmd of COMMANDS) {
         const m = cmd.re.exec(text);
         if (m) {
+            if (cmd.admin && !ctx.isAdmin) {
+                await reply(ctx, "⛔ Khusus admin.");
+                return true;
+            }
             try {
                 await cmd.run(ctx, m);
             } catch (e) {

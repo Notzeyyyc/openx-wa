@@ -1,4 +1,3 @@
-import fs from 'fs';
 import { loadJsonConfig, writeJsonConfig } from '../config.js';
 
 const REMINDERS_PATH = './package/reminders.json';
@@ -18,7 +17,7 @@ export function setReminder(chatId, timeStr, text) {
         id: Date.now().toString().slice(-6),
         chatId,
         text,
-        time: timeStr, // format: "HH:MM" or "YYYY-MM-DD HH:MM"
+        time: timeStr, // format: "HH:MM", fires once at the next match
         created: new Date().toISOString(),
         fired: false
     };
@@ -51,7 +50,7 @@ export function startReminderChecker(waSock) {
 
         for (const r of reminders) {
             if (r.fired) continue;
-            if (r.time === currentTime || (r.time.length === 5 && r.time === currentTime)) {
+            if (r.time === currentTime) {
                 r.fired = true;
                 changed = true;
                 if (waSock) {

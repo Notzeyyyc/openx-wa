@@ -17,8 +17,13 @@ WhatsApp AI productivity assistant. Belajar, kerja, dan produktivitas — semua 
 
 ### On Termux (Android)
 ```bash
-pkg install curl -y && curl -sL https://raw.githubusercontent.com/Notzeyyyc/openx-wa/main/scripts/termux-setup.sh | sh
+pkg install nodejs-lts git -y
+npm install -g pnpm
+git clone https://github.com/Notzeyyyc/openx-wa.git ~/openxx
+cd ~/openxx && pnpm install
+pnpm start   # scan QR, lalu Ctrl+C, isi .env, jalankan ulang
 ```
+Keep alive: `termux-wake-lock` + Termux battery unrestricted.
 
 ### On VPS
 ```bash
@@ -83,7 +88,7 @@ openxx/
 │       ├── queue.js           # Message queue
 │       └── conversation-store.js
 ├── setup/                # CLI setup tool
-└── scripts/              # Setup scripts
+└── scripts/              # Dev helpers (scan-secrets)
 ```
 
 ## License

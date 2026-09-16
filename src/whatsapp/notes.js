@@ -1,4 +1,3 @@
-import fs from 'fs';
 import { loadJsonConfig, writeJsonConfig } from '../config.js';
 
 const NOTES_PATH = './package/notes.json';

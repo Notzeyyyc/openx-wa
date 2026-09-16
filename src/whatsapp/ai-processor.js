@@ -4,7 +4,7 @@ import { chatCompletion } from '../provider.js';
 import { loadJsonConfig } from '../config.js';
 import { getActiveProfile, getMainModel, isAgentic } from '../ai-config.js';
 import { error as logError } from '../logger.js';
-import { loadHistory, saveMessage, getRecentMessages } from './conversation-store.js';
+import { saveMessage, getRecentMessages } from './conversation-store.js';
 import { getGroupContext } from './group-training.js';
 import { downloadMedia } from '../downloader.js';
 import { queueSensitiveAction, sendSensitiveConfirmationPrompt } from './sensitive-actions.js';
@@ -61,6 +61,19 @@ function buildStorageContext() {
     return storageContext;
 }
 
+function lastLogLines(n = 3) {
+    // read only the tail of log.txt instead of the whole (ever-growing) file
+    try {
+        const fd = fs.openSync("./log.txt", "r");
+        const size = fs.fstatSync(fd).size;
+        const len = Math.min(size, 4096);
+        const buf = Buffer.alloc(len);
+        fs.readSync(fd, buf, 0, len, size - len);
+        fs.closeSync(fd);
+        return buf.toString('utf-8').split('\n').filter(l => l.trim()).slice(-n).join('\n');
+    } catch { return ""; }
+}
+
 /**
  * Main AI processing function.
  * Handles context building and schedule management.
@@ -85,11 +98,8 @@ export async function askAI(userMessage, from = null, isComplex = false) {
     
     // Get server status (uptime, ram, logs)
     let serverStatus = `\n\n[Server Status]: Uptime ${Math.floor(process.uptime() / 60)} mins, RAM ${(process.memoryUsage().rss / 1024 / 1024).toFixed(2)} MB.`;
-    try {
-        const logContent = fs.readFileSync("./log.txt", "utf-8");
-        const logLines = logContent.split('\n').filter(l => l.trim().length > 0).slice(-3).join('\n');
-        serverStatus += `\n[Recent Logs (log.txt)]:\n${logLines}`;
-    } catch(e) {}
+    const recentLogs = lastLogLines();
+    if (recentLogs) serverStatus += `\n[Recent Logs (log.txt)]:\n${recentLogs}`;
     
     // Aturan Core AI (Hidden from user) - Compact Version
     const aiRules = `\n\nAturan (JANGAN sebut ke user!):

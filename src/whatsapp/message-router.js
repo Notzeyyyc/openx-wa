@@ -16,21 +16,15 @@ import { trackMessage, trackCommand } from '../analytics.js';
 const lastGroupResponse = new Map();
 
 export function setupMessageHandler(waSock) {
-    logFn("[DEBUG] Message handler initialized");
+    logFn("Message handler initialized");
     setupGroupParticipants(waSock);
-    waSock.ev.on('messages.upsert', async (m) => {
+
+    async function handleOne(msg) {
         try {
-            logFn(`[DEBUG] messages.upsert triggered, count=${m.messages?.length}`);
-            const msg = m.messages[0];
-            if (!msg.message) {
-                logFn("[DEBUG] msg.message is empty, skipping");
-                return;
-            }
+            if (!msg.message) return;
 
             const from = msg.key.remoteJid;
             const participant = msg.key.participant || from;
-
-            logFn(`[DEBUG] from=${from}, fromMe=${msg.key.fromMe}, pushName=${msg.pushName}`);
 
             let waConfig = { statusTargets: [], adminChannels: [] };
             try { waConfig = loadJsonConfig("./package/wa_config.json", waConfig); } catch(e) {}
@@ -87,8 +81,6 @@ export function setupMessageHandler(waSock) {
             const isGroup = from.endsWith('@g.us');
             const lowerText = textMessage ? textMessage.trim().toLowerCase() : '';
             const senderName = msg.pushName || (participant ? participant.split('@')[0] : from.split('@')[0]);
-
-            logFn(`[DEBUG] textMessage="${textMessage}", isMedia=${!!isMedia}, isGroup=${isGroup}`);
 
             // Track incoming message
             trackMessage(from, isGroup);
@@ -228,8 +220,6 @@ export function setupMessageHandler(waSock) {
 
                 if (!aiPromptUser) return;
 
-                const senderName = msg.pushName || (participant ? participant.split('@')[0] : from.split('@')[0]);
-                
                 // Smart queue
                 const existingReq = aiQueue.find(q => q.from === from);
                 if (existingReq) {
@@ -269,6 +259,10 @@ export function setupMessageHandler(waSock) {
         } catch (err) {
             logError(err);
         }
+    }
+
+    waSock.ev.on('messages.upsert', async (m) => {
+        for (const msg of m.messages ?? []) await handleOne(msg);
     });
 
     // Track group participant changes
