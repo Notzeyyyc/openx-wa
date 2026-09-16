@@ -4,16 +4,6 @@ import { sendThinkingIndicator, deleteThinkingIndicator, sendFormattedResponse }
 export const aiQueue = [];
 let isProcessingQueue = false;
 
-export let activeBgTask = null;
-
-export function cancelBgTask(selector = 'last') {
-    return { ok: false, msg: 'Tidak ada task queued.' };
-}
-
-export function getBgStatusText() {
-    return `📦 *Background Queue Status*\nAktif: -\nQueued: 0\nNext: -`;
-}
-
 export async function processQueue(waSock, askAI, stripMarkdown) {
     if (isProcessingQueue || aiQueue.length === 0) return;
     isProcessingQueue = true;

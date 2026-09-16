@@ -8,8 +8,8 @@ const TTS_API = "https://fgsi.dpdns.org/api/ai/clonevoice/text-to-speech";
  * @param {string} voiceId - Voice ID (default: Furina)
  * @returns {Buffer|null} Audio buffer or null on failure
  */
-export async function textToSpeech(text, voiceId = null) {
-    const apiKey = process.env.OPENX_TTS_API_KEY || process.env.OPENX_CLAUDE_API_KEY || '';
+async function textToSpeech(text, voiceId = null) {
+    const apiKey = process.env.OPENX_TTS_API_KEY || config.fgsi.apiKey;
     const voice = voiceId || process.env.OPENX_TTS_VOICE || 'voice_furina_';
 
     if (!apiKey) {
@@ -81,7 +81,7 @@ export async function sendVoiceNote(waSock, jid, text, quoted) {
  * Get list of available voices
  */
 export async function getVoiceList() {
-    const apiKey = process.env.OPENX_TTS_API_KEY || process.env.OPENX_CLAUDE_API_KEY || '';
+    const apiKey = process.env.OPENX_TTS_API_KEY || config.fgsi.apiKey;
     if (!apiKey) return [];
 
     try {

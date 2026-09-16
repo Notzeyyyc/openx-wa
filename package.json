@@ -7,22 +7,18 @@
     "start": "node index.js",
     "setup": "node setup/index.js",
     "scan:secrets": "node scripts/scan-secrets.mjs",
-    "test": "pnpm run scan:secrets"
+    "test": "pnpm run scan:secrets && node --test --test-force-exit src/whatsapp/commands.test.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.26.2",
   "dependencies": {
-    "@crysnovax/baileys": "^2.6.7",
-    "@openrouter/sdk": "^0.10.2",
-    "axios": "^1.18.1",
+    "@whiskeysockets/baileys": "6.7.24",
     "chalk": "^5.6.2",
     "node-cron": "^4.2.1",
     "pino": "^10.3.1",
-    "qrcode-terminal": "^0.12.0",
-    "sql.js": "^1.14.1",
-    "undici": "^8.6.0"
+    "qrcode-terminal": "^0.12.0"
   },
   "type": "module"
 }

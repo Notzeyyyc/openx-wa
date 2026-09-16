@@ -138,6 +138,7 @@ export async function sendThinkingIndicator(waSock, jid) {
     let stepIndex = 0;
 
     return {
+        msgId,
         // Update to next step
         update: async () => {
             stepIndex++;
@@ -224,21 +225,4 @@ export async function sendFormattedResponse(waSock, jid, text, quoted, options =
         text,
         footer: '✨ OpenXX'
     }, { quoted });
-}
-
-/**
- * Strip markdown for plain text
- */
-export function stripMarkdown(text) {
-    if (!text) return text;
-    return text
-        .replace(/\*\*/g, '')
-        .replace(/__/g, '')
-        .replace(/_/g, '')
-        .replace(/`/g, '')
-        .replace(/\[\]/g, '')
-        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-        .replace(/#{1,6}\s/g, '')
-        .replace(/\n\s*\n/g, '\n\n')
-        .trim();
 }

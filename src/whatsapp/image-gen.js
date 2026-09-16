@@ -1,32 +1,23 @@
 import { config } from '../config.js';
 
 /**
- * Generate image using AI provider with isImageGenerationMode
+ * Generate image using FGSi isImageGenerationMode endpoint
  */
 export async function generateImage(prompt) {
-    const provider = config.ai?.provider || 'openai';
-    const baseUrl = config.ai?.[provider]?.baseUrl || '';
-    const apiKey = config.ai?.[provider]?.apiKey || '';
-
+    const { baseUrl, apiKey } = config.fgsi;
     if (!baseUrl || !apiKey) {
-        return { ok: false, error: 'API not configured' };
+        return { ok: false, error: 'FGSI API not configured (set OPENX_FGSI_API_KEY)' };
     }
 
     try {
-        const body = {
-            apikey: apiKey,
-            messages: [{ id: Date.now(), role: 'user', parts: [{ type: 'text', text: prompt }] }],
-            model: config.ai?.[provider]?.model || '',
-            isDeepResearchMode: false,
-            isWebSearchMode: false,
-            isImageGenerationMode: true,
-            isAgenticMode: false
-        };
-
         const res = await fetch(baseUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify(body),
+            body: JSON.stringify({
+                apikey: apiKey,
+                messages: [{ id: Date.now(), role: 'user', parts: [{ type: 'text', text: prompt }] }],
+                isImageGenerationMode: true
+            }),
             signal: AbortSignal.timeout(60000)
         });
 
@@ -47,8 +38,6 @@ export async function generateImage(prompt) {
             ok: true,
             imageUrl: images[0]?.url || null,
             text: text || null,
-            width: images[0]?.width || 0,
-            height: images[0]?.height || 0
         };
     } catch (e) {
         return { ok: false, error: e.message };

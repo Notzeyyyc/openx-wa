@@ -28,11 +28,11 @@ export function stripMarkdown(text) {
         .trim();
 }
 
-export function generateFileId() {
+function generateFileId() {
     return Math.floor(10000 + Math.random() * 90000).toString();
 }
 
-export function ensureUserDir(chatId) {
+function ensureUserDir(chatId) {
     const cleanId = String(chatId).split('@')[0];
     const dir = path.join("./caches/files", cleanId);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -67,7 +67,7 @@ export function getLocalFileById(chatId, fileIdNum) {
     }
 }
 
-export function getLocalMeta(chatId) {
+function getLocalMeta(chatId) {
     const dir = path.join("./caches/files", String(chatId).split('@')[0]);
     const metaPath = path.join(dir, "meta.json");
     try {
@@ -77,7 +77,7 @@ export function getLocalMeta(chatId) {
     }
 }
 
-export function setLocalMeta(chatId, meta) {
+function setLocalMeta(chatId, meta) {
     const dir = path.join("./caches/files", String(chatId).split('@')[0]);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     const metaPath = path.join(dir, "meta.json");

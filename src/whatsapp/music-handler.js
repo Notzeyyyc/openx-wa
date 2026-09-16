@@ -109,39 +109,3 @@ export async function downloadByTrackUrl(trackUrl) {
         return { ok: false, error: e.message };
     }
 }
-
-/**
- * Get album info
- */
-export async function getAlbumInfo(albumId) {
-    const apiKey = process.env.OPENX_SPOTIFY_API_KEY || '';
-    if (!apiKey) return { ok: false, error: "Spotify API key not set" };
-
-    try {
-        const url = `${COVENANT_API}/album?id=${albumId}`;
-        const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
-        const data = await res.json();
-        if (!data.status) return { ok: false, error: data.message || 'Failed' };
-        return { ok: true, data: data.data || data };
-    } catch (e) {
-        return { ok: false, error: e.message };
-    }
-}
-
-/**
- * Get artist info
- */
-export async function getArtistInfo(artistId) {
-    const apiKey = process.env.OPENX_SPOTIFY_API_KEY || '';
-    if (!apiKey) return { ok: false, error: "Spotify API key not set" };
-
-    try {
-        const url = `${COVENANT_API}/artist?id=${artistId}`;
-        const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
-        const data = await res.json();
-        if (!data.status) return { ok: false, error: data.message || 'Failed' };
-        return { ok: true, data: data.data || data };
-    } catch (e) {
-        return { ok: false, error: e.message };
-    }
-}

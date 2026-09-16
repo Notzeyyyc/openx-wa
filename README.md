@@ -4,7 +4,7 @@ WhatsApp AI productivity assistant. Belajar, kerja, dan produktivitas — semua 
 
 ## Features
 
-- **AI Chat** — Multi-provider (OpenAI, Claude, ChatGPT, Gemini, OpenRouter)
+- **AI Chat** — any OpenAI-compatible API (SumoPod, OpenRouter, etc.)
 - **Agents** — Homework, Essay, Solver, Research, Translate, Vision
 - **Notes** — Simpan catatan via WhatsApp
 - **Reminders** — Set pengingat via WhatsApp
@@ -42,7 +42,7 @@ pm2 save && pm2 startup
 | `.agent homework <task>` | Homework help |
 | `.agent essay <task>` | Essay writing |
 | `.agent solver <task>` | Math/science solver |
-| `.ai provider <name>` | Change AI provider |
+| `.ai url <base-url>` | Set AI base URL |
 | `.ai apikey <key>` | Set API key |
 | `.ai status` | Check config |
 | `.stats` | View statistics |
@@ -54,7 +54,7 @@ pm2 save && pm2 startup
 All settings via WhatsApp:
 ```
 .ai phone <number>     — set admin number
-.ai provider <name>    — openai, claude, chatgpt, gemini, openrouter
+.ai url <base-url>     — OpenAI-compatible API base URL
 .ai apikey <key>       — set API key
 .ai model <name>       — set model
 .ai status             — check config
@@ -67,16 +67,9 @@ openxx/
 ├── index.js              # Entry point
 ├── src/
 │   ├── config.js         # Configuration
-│   ├── ai-provider.js    # AI provider router
-│   ├── ai-config.js      # Flexible AI config
-│   ├── database.js       # SQLite database
+│   ├── provider.js       # OpenAI-compatible chat API
+│   ├── ai-config.js      # AI profiles config
 │   ├── analytics.js      # Usage tracking
-│   ├── providers/        # AI providers
-│   │   ├── openai.js
-│   │   ├── claude.js
-│   │   ├── chatgpt.js
-│   │   ├── gemini.js
-│   │   └── openrouter.js
 │   └── whatsapp/
 │       ├── connection.js      # WhatsApp socket
 │       ├── message-router.js  # Message routing

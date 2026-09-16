@@ -1,10 +1,8 @@
-import { makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestWaWebVersion } from '@crysnovax/baileys';
+import { makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestWaWebVersion } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import qrcode from 'qrcode-terminal';
 import fs from 'fs';
-import { config } from '../config.js';
 import { log, error as logError } from '../logger.js';
-import { initPluginManager } from '../plugin-manager.mjs';
 import { askAI } from './ai-processor.js';
 import { stripMarkdown } from './helpers.js';
 import { setupMessageHandler } from './message-router.js';
@@ -46,18 +44,6 @@ export async function connectToWhatsApp() {
             }
         } else if (connection === 'open') {
             log('Successfully connected to WhatsApp!');
-
-            // Initialise plugin system
-            if (!config.devPhoneNumber) {
-                logError('Missing OPENX_DEV_PHONE_NUMBER. Set it in environment/.env before running.');
-            }
-            const adminJid = (config.devPhoneNumber || '').includes('@')
-                ? config.devPhoneNumber
-                : `${config.devPhoneNumber}@s.whatsapp.net`;
-            const notify = (text) => {
-                try { waSock.sendMessage(adminJid, { text: String(text) }); } catch {}
-            };
-            initPluginManager({ notify, sendMessageFn: (jid, msg) => waSock.sendMessage(jid, msg) }).catch(() => {});
 
             // Start reminder checker
             startReminderChecker(waSock);

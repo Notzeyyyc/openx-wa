@@ -1,5 +1,4 @@
-ignoredBuiltDependencies:
-  - '@openrouter/sdk'
+ignoredBuiltDependencies: []
 
 onlyBuiltDependencies:
   - '@whiskeysockets/baileys'

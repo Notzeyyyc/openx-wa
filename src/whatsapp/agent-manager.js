@@ -1,5 +1,5 @@
-import { chatCompletion } from '../ai-provider.js';
-import { getAgentProvider, getAgentModel, getAgentApiKey } from '../ai-config.js';
+import { chatCompletion } from '../provider.js';
+import { getAgentProfile } from '../ai-config.js';
 import { log as logFn, error as logError } from '../logger.js';
 
 // Active agents
@@ -131,14 +131,12 @@ async function runAgent(agent, agentType, waSock) {
             { role: 'user', content: agent.task }
         ];
 
-        // Get agent-specific provider/model/apiKey from config
-        const provider = getAgentProvider(agent.type);
-        const model = getAgentModel(agent.type);
-        const apiKey = getAgentApiKey(agent.type);
+        // Get agent-specific profile (falls back to active)
+        const profile = getAgentProfile(agent.type);
 
-        logFn(`[${agent.name}] Running with ${provider}${model ? '/' + model : ''}: ${agent.task.slice(0, 50)}...`);
+        logFn(`[${agent.name}] Running with ${profile.baseUrl}/${profile.model || 'default'}: ${agent.task.slice(0, 50)}...`);
 
-        const result = await chatCompletion(messages, model || null, true, null, provider, apiKey);
+        const result = await chatCompletion(profile, messages, true);
         agent.result = result;
         agent.status = 'completed';
         agent.finishedAt = Date.now();
@@ -166,17 +164,7 @@ async function runAgent(agent, agentType, waSock) {
     }
 }
 
-/**
- * Get agent status
- */
-export function getAgent(id) {
-    return activeAgents.get(id) || null;
-}
-
-/**
- * List all agents
- */
-export function listAgents() {
+function listAgents() {
     return Array.from(activeAgents.values())
         .sort((a, b) => b.startedAt - a.startedAt)
         .slice(0, 20);
@@ -203,5 +191,3 @@ export function getAgentsStatus() {
         return `${statusIcon} ${a.icon} ${a.id} — ${a.status} (${duration})`;
     }).join('\n');
 }
-
-export { AGENT_TYPES };

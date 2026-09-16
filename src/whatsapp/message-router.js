@@ -1,10 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import pino from 'pino';
-import { downloadMediaMessage } from '@crysnovax/baileys';
+import { downloadMediaMessage } from '@whiskeysockets/baileys';
 import { loadJsonConfig } from '../config.js';
 import { log as logFn, error as logError } from '../logger.js';
-import { chatCompletion } from '../ai-provider.js';
 import { askAI } from './ai-processor.js';
 import { stripMarkdown, saveLocalFile, getLocalFileById } from './helpers.js';
 import { handleCommands } from './commands.js';
@@ -187,9 +186,6 @@ export function setupMessageHandler(waSock) {
                     trackCommand(from, textMessage.trim().split(/\s+/)[0]);
                     return;
                 }
-
-                // Plugin system hook
-                // (import handlePluginsMessage from plugin_manager when ready)
 
                 let isComplex = false;
                 let aiPromptUser = "";

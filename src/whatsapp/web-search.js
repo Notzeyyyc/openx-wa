@@ -1,32 +1,23 @@
 import { config } from '../config.js';
 
 /**
- * Web search using AI provider with isWebSearchMode
+ * Web search using FGSi isWebSearchMode endpoint
  */
 export async function webSearch(query) {
-    const provider = config.ai?.provider || 'openai';
-    const baseUrl = config.ai?.[provider]?.baseUrl || '';
-    const apiKey = config.ai?.[provider]?.apiKey || '';
-
+    const { baseUrl, apiKey } = config.fgsi;
     if (!baseUrl || !apiKey) {
-        return { ok: false, error: 'API not configured' };
+        return { ok: false, error: 'FGSI API not configured (set OPENX_FGSI_API_KEY)' };
     }
 
     try {
-        const body = {
-            apikey: apiKey,
-            messages: [{ id: Date.now(), role: 'user', parts: [{ type: 'text', text: query }] }],
-            model: config.ai?.[provider]?.model || '',
-            isDeepResearchMode: false,
-            isWebSearchMode: true,
-            isImageGenerationMode: false,
-            isAgenticMode: false
-        };
-
         const res = await fetch(baseUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-            body: JSON.stringify(body),
+            body: JSON.stringify({
+                apikey: apiKey,
+                messages: [{ id: Date.now(), role: 'user', parts: [{ type: 'text', text: query }] }],
+                isWebSearchMode: true
+            }),
             signal: AbortSignal.timeout(30000)
         });
 

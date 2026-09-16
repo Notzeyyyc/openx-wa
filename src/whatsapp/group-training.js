@@ -29,7 +29,7 @@ export function getGroupTraining(jid) {
 /**
  * Save group training data
  */
-export function saveGroupTraining(jid, data) {
+function saveGroupTraining(jid, data) {
     const db = loadGroupsDb();
     db[jid] = {
         ...db[jid],
@@ -184,15 +184,3 @@ export function getGroupContext(jid) {
     return lines.join('\n');
 }
 
-/**
- * List all groups
- */
-export function listGroups() {
-    const db = loadGroupsDb();
-    return Object.entries(db).map(([jid, data]) => ({
-        jid,
-        name: data.name || 'Unknown',
-        members: data.memberCount || 0,
-        lastUpdated: data.lastUpdated
-    }));
-}

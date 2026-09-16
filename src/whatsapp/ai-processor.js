@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import { chatCompletion } from '../ai-provider.js';
+import { chatCompletion } from '../provider.js';
 import { loadJsonConfig } from '../config.js';
-import { getMainProvider, getMainModel } from '../ai-config.js';
+import { getActiveProfile, getMainModel, isAgentic } from '../ai-config.js';
 import { error as logError } from '../logger.js';
 import { loadHistory, saveMessage, getRecentMessages } from './conversation-store.js';
 import { getGroupContext } from './group-training.js';
@@ -127,9 +127,8 @@ Sebelum aksi sensitif, kasih [PRE_NOTIFY|pesan] dulu. Use 'none' jika Target WA 
     if (from) saveMessage(from, 'user', userMessage);
 
     const startTime = Date.now();
-    const provider = getMainProvider();
     const model = getMainModel() || getCurrentModel();
-    let aiResult = await chatCompletion(messages, model, isComplex, from, provider) || "";
+    let aiResult = await chatCompletion({ ...getActiveProfile(), model }, messages, isComplex || isAgentic()) || "";
     const responseTimeMs = Date.now() - startTime;
     if (from) trackAIResponse(from, responseTimeMs, model);
     

@@ -3,7 +3,7 @@ import os from 'os';
 const HISTORY_SIZE = 60; // keep last 60 readings (1 per minute)
 const ramHistory = [];
 
-export function getRamUsage() {
+function getRamUsage() {
     const total = os.totalmem();
     const free = os.freemem();
     const used = total - free;

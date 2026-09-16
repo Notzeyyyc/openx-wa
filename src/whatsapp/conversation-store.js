@@ -62,7 +62,7 @@ export function getRecentMessages(chatId, count = 10) {
     return history.slice(-count);
 }
 
-export function cleanupOldSessions() {
+function cleanupOldSessions() {
     const now = Date.now();
     for (const [chatId, entry] of cache) {
         if (now - entry.lastAccess > CACHE_TTL_MS * 2) {

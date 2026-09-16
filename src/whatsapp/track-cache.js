@@ -44,7 +44,7 @@ export function getCachedTrack(id) {
 /**
  * Clean expired entries
  */
-export function cleanCache() {
+function cleanCache() {
     const now = Date.now();
     for (const [id, track] of cache) {
         if (now - track.cachedAt > CACHE_TTL_MS) {
