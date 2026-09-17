@@ -1,7 +1,6 @@
-import fs from 'fs';
 import path from 'path';
-import { config, loadJsonConfig, writeJsonConfig } from '../config.js';
-import { DATA_DIR, ENV_FILE } from '../paths.js';
+import { loadJsonConfig, writeJsonConfig } from '../config.js';
+import { DATA_DIR } from '../paths.js';
 import {
     fetchBuffer,
     listLocalFiles, deleteLocalFileById, renameLocalFileById
@@ -18,27 +17,39 @@ import {
 } from '../ai-config.js';
 import { addNote, listNotes, deleteNote, searchNotes } from './notes.js';
 import { setReminder, listReminders, cancelReminder } from './reminders.js';
-import { getGroup, setGroup, setGroupApproved, setGroupDelay } from './group-manager.js';
+import { getGroup, setGroup, setGroupApproved, setGroupDelay, isGroupApproved, getGroupKeywords } from './group-manager.js';
 import { trainGroup, addGroupRule, removeGroupRule, addGroupTopic, getGroupContext, getGroupTraining } from './group-training.js';
 import { listModels, groupByFamily } from '../models.js';
+import { getOwner, isOwner, claimOwner } from '../owner.js';
 
 const SENSITIVE_TTL_MS = 2 * 60 * 1000;
 
 // --- tiny helpers shared by all handlers ---
 const reply = (ctx, text) => ctx.waSock.sendMessage(ctx.from, { text }, { quoted: ctx.msg });
 const replyErr = (ctx, err) => reply(ctx, `❌ ${err}`);
-const envSet = (key, value) => {
-    let env = '';
-    try { env = fs.readFileSync(ENV_FILE, 'utf-8'); } catch {}
-    env = new RegExp(`^${key}=.*`, 'm').test(env)
-        ? env.replace(new RegExp(`^${key}=.*`, 'm'), `${key}=${value}`)
-        : env + `\n${key}=${value}\n`;
-    fs.writeFileSync(ENV_FILE, env);
-    process.env[key] = value;
-};
 
 // --- command handlers (ordered; first regex match wins) ---
 const COMMANDS = [
+{
+    re: /^\.start(?:\s+(\S+))?$/i,
+    run: async (ctx, m) => {
+        const owner = getOwner();
+        if (owner) {
+            if (isOwner(ctx.sender)) {
+                return reply(ctx, `👑 Kamu owner bot ini (${owner.jid}).\n\nCommand owner udah kebuka: .ai, .group, .model, .note, .reminder, reset, gc`);
+            }
+            return reply(ctx, "⛔ Bot sudah punya owner.");
+        }
+        if (!m[1]) {
+            return reply(ctx, "🔑 Belum ada owner.\n\nKode setup ada di console/log bot, lalu kirim: `.start <kode>`");
+        }
+        const res = claimOwner(ctx.sender, ctx.senderName, m[1]);
+        if (!res.ok) {
+            return reply(ctx, res.reason === 'bad_code' ? "❌ Kode setup salah." : "⛔ Klaim owner gagal.");
+        }
+        return reply(ctx, `👑 Owner aktif: ${res.owner.jid}\n\nCommand owner sekarang kebuka.`);
+    }
+},
 {
     re: /^(files|list files|daftar file|my files)$/i,
     run: async (ctx) => {
@@ -248,13 +259,6 @@ const COMMANDS = [
             return reply(ctx, `✅ API Key set: ***${apiKey.slice(-4)}`);
         }
 
-        if (sub === 'phone') {
-            const phone = ctx.args[2];
-            if (!phone) return reply(ctx, "❓ Usage: .ai phone <number>\nExample: .ai phone 628123456789");
-            envSet('OPENX_DEV_PHONE_NUMBER', phone);
-            return reply(ctx, `✅ Phone number set to: ${phone}`);
-        }
-
         if (sub === 'models') {
             const filter = ctx.args[2]?.toLowerCase();
             const profile = getActiveProfile();
@@ -278,6 +282,23 @@ const COMMANDS = [
         }
 
         await reply(ctx, "❓ *AI Commands:*\n.ai status — lihat config\n.ai models [filter] — list models per provider\n.ai switch <name> — switch profile\n.ai save <name> — save current as profile\n.ai delete <name> — delete profile\n.ai url <base-url> — set API base URL (OpenAI-compatible)\n.ai model <name> — set model\n.ai apikey <key> — set API key");
+    }
+},
+{
+    re: /^\.group\s+nimbrung(?:\s+(on|off))?$/i,
+    admin: true,
+    run: async (ctx, m) => {
+        if (!ctx.isGroup) return replyErr(ctx, "Group commands only work in groups.");
+        const val = m[1]?.toLowerCase();
+        if (val === 'on') {
+            setGroupApproved(ctx.from, true);
+            return reply(ctx, "✅ Nimbrung ON — bot balas semua pesan grup (pakai delay).");
+        }
+        if (val === 'off') {
+            setGroupApproved(ctx.from, false);
+            return reply(ctx, "❌ Nimbrung OFF — bot cuma balas kalau di-mention/ada keyword.");
+        }
+        return reply(ctx, `Nimbrung sekarang: ${isGroupApproved(ctx.from) ? '✅ ON' : '❌ OFF'}\nUsage: .group nimbrung on/off`);
     }
 },
 {
@@ -399,8 +420,9 @@ const COMMANDS = [
                 `Welcome msg: ${group.welcome_message || '(default)'}`,
                 `Anti-spam: ${group.spam_protection ? '✅ ON' : '❌ OFF'}`,
                 `Auto-reply: ${group.auto_reply_enabled ? '✅ ON' : '❌ OFF'}`,
-                `AI Chat: ${group.ai_enabled ? '✅ ON' : '❌ OFF'}`,
-                `AI Keywords: ${(group.ai_keywords || ['bot', 'openx']).join(', ')}`,
+                `Nimbrung (balas semua): ${group.ai_approved ? '✅ ON' : '❌ OFF'}`,
+                `AI (mention/keyword): ${group.ai_enabled ? '✅ ON' : '❌ OFF'}`,
+                `AI Keywords: ${getGroupKeywords(ctx.from).join(', ')}`,
                 `Muted: ${group.muted ? '🔇 YES' : '🔊 NO'}`
             ].join('\n'));
         }
@@ -420,7 +442,7 @@ const COMMANDS = [
         }
         if (sub === 'keyword') {
             const kw = ctx.args[3];
-            const currentKw = group.ai_keywords || ['bot', 'openx'];
+            const currentKw = getGroupKeywords(ctx.from);
             if (val === 'add' && kw) {
                 if (!currentKw.includes(kw.toLowerCase())) {
                     currentKw.push(kw.toLowerCase());
@@ -484,32 +506,28 @@ const COMMANDS = [
             return reply(ctx, `📋 *Group Info:*\n\n${getGroupContext(ctx.from)}`);
         }
 
-        await reply(ctx, "❓ *Group Commands:*\n.group settings\n.group welcome on/off/<msg>\n.group spam on/off\n.group reply on/off\n.group mute/unmute\n.group ai on/off\n.group approve — AI auto-respond\n.group unapprove — disable AI\n.group delay <sec> — set response delay\n.group keyword add/remove/list\n.group train — train group info\n.group rule add/remove/list\n.group topic add/list\n.group info — view group context");
+        await reply(ctx, "❓ *Group Commands:*\n.group settings\n.group welcome on/off/<msg>\n.group spam on/off\n.group reply on/off\n.group mute/unmute\n.group nimbrung on/off — balas semua pesan grup\n.group ai on/off — balas saat mention/keyword\n.group approve/unapprove — alias nimbrung\n.group delay <sec> — set response delay\n.group keyword add/remove/list\n.group train — train group info\n.group rule add/remove/list\n.group topic add/list\n.group info — view group context");
     }
 },
 ];
 
-function adminJid() {
-    const raw = config.devPhoneNumber || '';
-    if (!raw) return null;
-    return (raw.includes('@') ? raw : `${raw}@s.whatsapp.net`).split(':')[0];
-}
-
 export async function handleCommands(from, textMessage, msg, waSock) {
-    const text = textMessage.trim().replace(/\s+/g, ' ');
+    const text = textMessage.trim().replace(/\s+/g, ' ').replace(/^\//, '.');
     const sender = String(msg.key?.participant || from).split(':')[0];
     const ctx = {
         from, msg, waSock, text,
         args: text.split(' '),
         isGroup: from.endsWith('@g.us'),
-        isAdmin: !!adminJid() && sender === adminJid(),
+        sender,
+        senderName: msg.pushName || sender.split('@')[0],
+        isAdmin: isOwner(sender),
     };
 
     for (const cmd of COMMANDS) {
         const m = cmd.re.exec(text);
         if (m) {
             if (cmd.admin && !ctx.isAdmin) {
-                await reply(ctx, "⛔ Khusus admin.");
+                await reply(ctx, "⛔ Khusus owner.");
                 return true;
             }
             try {

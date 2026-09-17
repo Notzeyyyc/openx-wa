@@ -8,7 +8,7 @@ import { askAI } from './ai-processor.js';
 import { stripMarkdown, saveLocalFile, getLocalFileById } from './helpers.js';
 import { handleCommands } from './commands.js';
 import { aiQueue, processQueue } from './queue.js';
-import { getGroup, checkSpam, checkAutoReply, isGroupApproved, getGroupDelay, setupGroupParticipants } from './group-manager.js';
+import { getGroup, checkSpam, checkAutoReply, isGroupApproved, getGroupDelay, getGroupKeywords, setupGroupParticipants } from './group-manager.js';
 import { addGroupMember, removeGroupMember } from './group-training.js';
 import { DATA_DIR } from '../paths.js';
 
@@ -121,15 +121,10 @@ export function setupMessageHandler(waSock) {
                     return;
                 }
 
-                // If AI not enabled in group, skip AI processing for non-prefix messages
-                if (!group?.ai_enabled && !approved && !lowerText.startsWith('.openx')) {
-                    // Allow commands but skip natural AI chat
-                    if (!lowerText.startsWith('.group') &&
-                        !lowerText.startsWith('.model') &&
-                        !lowerText.startsWith('reset') && !lowerText.startsWith('clear') &&
-                        !lowerText.startsWith('ram') && !lowerText.startsWith('gc')) {
-                        return;
-                    }
+                // If AI not enabled in group, only let commands through (skip natural AI chat)
+                const isCommand = lowerText.startsWith('.') || lowerText.startsWith('/');
+                if (!group?.ai_enabled && !approved && !isCommand) {
+                    return;
                 }
             }
 
@@ -176,10 +171,10 @@ export function setupMessageHandler(waSock) {
                 let isComplex = false;
                 let aiPromptUser = "";
 
-                if (lowerText.startsWith('.openxc')) {
+                if (lowerText.startsWith('.openxc') || lowerText.startsWith('/openxc')) {
                     isComplex = true;
                     aiPromptUser = textMessage.trim().substring(7).trim();
-                } else if (lowerText.startsWith('.openx')) {
+                } else if (lowerText.startsWith('.openx') || lowerText.startsWith('/openx')) {
                     isComplex = false;
                     aiPromptUser = textMessage.trim().substring(6).trim();
                 } else if (!isGroup) {
@@ -195,7 +190,7 @@ export function setupMessageHandler(waSock) {
                     const isMentioned = botJid && mentionedJids.includes(botJid);
 
                     // Check keyword triggers
-                    const keywords = group?.ai_keywords || ['bot', 'openx'];
+                    const keywords = getGroupKeywords(from);
                     const hasKeyword = keywords.some(kw => lowerText.includes(kw.toLowerCase()));
 
                     if (isMentioned || hasKeyword) {

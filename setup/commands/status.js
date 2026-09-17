@@ -24,8 +24,5 @@ export const statusCommand = new Command('status')
     const apiKey = getEnv('OPENX_OPENAI_API_KEY');
     console.log(`AI: ${baseUrl} (${model}) ${apiKey ? '✓ key set' : '✗ no key'}`);
 
-    const phone = getEnv('OPENX_DEV_PHONE_NUMBER');
-    console.log(`Admin phone: ${phone || 'not set'}`);
-
     console.log('');
   });

@@ -38,6 +38,16 @@ export function setGroupApproved(jid, approved) {
     setGroup(jid, { ai_approved: approved });
 }
 
+export const DEFAULT_AI_KEYWORDS = ['bot', 'openx'];
+
+/**
+ * Keywords that trigger AI in mention/keyword mode.
+ */
+export function getGroupKeywords(jid) {
+    const group = getGroup(jid);
+    return group?.ai_keywords || DEFAULT_AI_KEYWORDS;
+}
+
 /**
  * Get group AI delay (seconds between responses)
  */

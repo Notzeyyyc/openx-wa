@@ -11,7 +11,6 @@ function loadDotEnvIfPresent() {
 loadDotEnvIfPresent();
 
 export const config = {
-    devPhoneNumber: process.env.OPENX_DEV_PHONE_NUMBER || "",
     ai: {
         openai: {
             baseUrl: process.env.OPENX_OPENAI_BASE_URL || "https://ai.sumopod.com",
