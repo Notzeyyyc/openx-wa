@@ -29,6 +29,46 @@ export function stripMarkdown(text) {
         .trim();
 }
 
+/**
+ * Strip an HTML document down to readable text (scripts/styles/tags/entities removed).
+ */
+export function extractReadableText(html) {
+    if (!html) return '';
+    return String(html)
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+        .replace(/<!--[\s\S]*?-->/g, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&amp;/gi, '&')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+/**
+ * Fetch a URL and return its readable text (capped), for summarization.
+ */
+export async function fetchArticleText(url, maxChars = 8000) {
+    try {
+        const res = await fetch(url, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; OpenXXBot/1.0)' },
+            signal: AbortSignal.timeout(15000)
+        });
+        if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+        const text = extractReadableText(await res.text()).slice(0, maxChars);
+        if (text.length < 50) return { ok: false, error: 'Konten tidak terbaca' };
+        return { ok: true, text };
+    } catch (e) {
+        return { ok: false, error: e.message };
+    }
+}
+
+
 function generateFileId() {
     return Math.floor(10000 + Math.random() * 90000).toString();
 }

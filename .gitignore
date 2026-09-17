@@ -18,3 +18,5 @@ data/groups.json
 data/groups-db.json
 data/analytics.jsonl
 data/owner.json
+data/quiz-scores.json
+data/absen.json

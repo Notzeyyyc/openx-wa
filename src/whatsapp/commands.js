@@ -3,8 +3,19 @@ import { loadJsonConfig, writeJsonConfig } from '../config.js';
 import { DATA_DIR } from '../paths.js';
 import {
     fetchBuffer,
-    listLocalFiles, deleteLocalFileById, renameLocalFileById
+    listLocalFiles, deleteLocalFileById, renameLocalFileById,
+    fetchArticleText, stripMarkdown
 } from './helpers.js';
+import { chatCompletion } from '../provider.js';
+import { buildPollPayload } from './poll.js';
+import {
+    parseQuizResponse, parseAnswer, startQuiz, getSession as getQuizSession,
+    currentQuestion, submitAnswer, clearSession as clearQuiz, recordScore
+} from './quiz.js';
+import {
+    openSession as openAbsen, getSession as getAbsenSession,
+    markPresent, closeSession as closeAbsen, formatHadir
+} from './absen.js';
 import { webSearch } from './web-search.js';
 import { generateImage } from './image-gen.js';
 import { pendingSensitiveActions, executeSensitiveAction } from './sensitive-actions.js';
@@ -13,7 +24,7 @@ import { getRamReport, getRamTrend, forceGarbageCollect } from './ram-monitor.js
 import {
     getMainModel, setMainModel, setMainApiKey, setMainBaseUrl,
     getAIStatus, getActiveProfileName, setActiveProfile, saveProfile,
-    listProfiles, deleteProfile
+    listProfiles, deleteProfile, getActiveProfile
 } from '../ai-config.js';
 import { addNote, listNotes, deleteNote, searchNotes } from './notes.js';
 import { setReminder, listReminders, cancelReminder } from './reminders.js';
@@ -27,6 +38,14 @@ const SENSITIVE_TTL_MS = 2 * 60 * 1000;
 // --- tiny helpers shared by all handlers ---
 const reply = (ctx, text) => ctx.waSock.sendMessage(ctx.from, { text }, { quoted: ctx.msg });
 const replyErr = (ctx, err) => reply(ctx, `❌ ${err}`);
+
+async function sendQuizQuestion(ctx) {
+    const q = currentQuestion(ctx.from);
+    const s = getQuizSession(ctx.from);
+    if (!q || !s) return;
+    const opts = q.options.map((o, i) => `${String.fromCharCode(65 + i)}. ${o}`).join('\n');
+    await reply(ctx, `Soal ${s.idx + 1}/${s.questions.length}\n\n${q.q}\n\n${opts}\n\nJawab: .jawab <A/B/C/D>`);
+}
 
 // --- command handlers (ordered; first regex match wins) ---
 const COMMANDS = [
@@ -48,6 +67,120 @@ const COMMANDS = [
             return reply(ctx, res.reason === 'bad_code' ? "❌ Kode setup salah." : "⛔ Klaim owner gagal.");
         }
         return reply(ctx, `👑 Owner aktif: ${res.owner.jid}\n\nCommand owner sekarang kebuka.`);
+    }
+},
+{
+    re: /^\.poll\s+(.+)$/i,
+    run: async (ctx, m) => {
+        const res = buildPollPayload(m[1]);
+        if (!res.ok) {
+            const msg = {
+                usage: "❓ Usage: .poll <pertanyaan> | opsi 1 | opsi 2",
+                name_too_long: "❌ Pertanyaan maks 255 karakter.",
+                too_many_options: "❌ Opsi maksimal 12.",
+                option_too_long: "❌ Tiap opsi maks 100 karakter."
+            };
+            return replyErr(ctx, msg[res.error] || "Format poll salah.");
+        }
+        await ctx.waSock.sendMessage(ctx.from, { poll: res.poll });
+    }
+},
+{
+    re: /^\.ringkas\s+(https?:\/\/\S+)$/i,
+    run: async (ctx, m) => {
+        const { ok, text, error } = await fetchArticleText(m[1]);
+        if (!ok) return replyErr(ctx, `Gagal ambil artikel: ${error}`);
+        const summary = await chatCompletion(getActiveProfile(), [
+            { role: 'system', content: 'Ringkas artikel berikut jadi 3-5 poin bullet singkat berbahasa Indonesia. Jangan menambah fakta baru.' },
+            { role: 'user', content: text }
+        ]);
+        await reply(ctx, stripMarkdown(summary) || "Gagal meringkas artikel.");
+    }
+},
+{
+    re: /^\.quiz\s+stop$/i,
+    run: async (ctx) => {
+        clearQuiz(ctx.from);
+        await reply(ctx, "🛑 Quiz dibatalkan.");
+    }
+},
+{
+    re: /^\.quiz(?:\s+(.+))?$/i,
+    run: async (ctx, m) => {
+        const materi = m[1]?.trim() || 'pengetahuan umum';
+        await reply(ctx, `🧠 Nyusun 5 soal tentang *${materi}*...`);
+        let questions = null;
+        try {
+            const aiText = await chatCompletion(getActiveProfile(), [
+                { role: 'system', content: 'Kamu pembuat soal. Balas HANYA JSON array, tanpa teks lain.' },
+                { role: 'user', content: `Buat 5 soal pilihan ganda bahasa Indonesia tentang: ${materi}. Format tepat: [{"q":"pertanyaan","options":["a","b","c","d"],"answer":0}] dengan answer = index jawaban benar (0-3).` }
+            ], true);
+            questions = parseQuizResponse(aiText);
+        } catch (e) {
+            return replyErr(ctx, `Gagal bikin soal: ${e.message}`);
+        }
+        if (!questions) return replyErr(ctx, "AI balas format ngaco, coba lagi.");
+        startQuiz(ctx.from, questions.slice(0, 5));
+        await sendQuizQuestion(ctx);
+    }
+},
+{
+    re: /^\.jawab\s+(\S+)$/i,
+    run: async (ctx, m) => {
+        const q = currentQuestion(ctx.from);
+        if (!q) return replyErr(ctx, "Ga ada quiz aktif. Mulai pakai .quiz");
+        const idx = parseAnswer(m[1], q.options.length);
+        if (idx < 0) return replyErr(ctx, `Jawaban harus A-${String.fromCharCode(64 + q.options.length)} (atau 1-${q.options.length}).`);
+
+        const res = submitAnswer(ctx.from, idx);
+        let msg = res.correct ? "✅ Bener!" : `❌ Salah. Jawaban: ${q.options[res.correctIndex]}`;
+        msg += `\nSkor: ${res.score}/${res.total}`;
+        await reply(ctx, msg);
+
+        if (res.done) {
+            const rec = recordScore(ctx.from, res.score, res.total);
+            await reply(ctx, `🏁 Selesai! Skor ${res.score}/${res.total} — terbaik ${rec.best}/${rec.total} (main ${rec.plays}x)`);
+        } else {
+            await sendQuizQuestion(ctx);
+        }
+    }
+},
+{
+    re: /^\.absen\s+list$/i,
+    run: async (ctx) => {
+        if (!ctx.isGroup) return replyErr(ctx, "Absen cuma jalan di grup.");
+        await reply(ctx, formatHadir(getAbsenSession(ctx.from)) || "Ga ada sesi absen aktif.");
+    }
+},
+{
+    re: /^\.absen\s+tutup$/i,
+    admin: true,
+    run: async (ctx) => {
+        if (!ctx.isGroup) return replyErr(ctx, "Absen cuma jalan di grup.");
+        const rec = closeAbsen(ctx.from);
+        if (!rec) return replyErr(ctx, "Ga ada sesi absen aktif.");
+        const list = rec.hadir.map((h, i) => `${i + 1}. ${h.name}`).join('\n') || '(kosong)';
+        await reply(ctx, `✅ Absen ditutup: *${rec.title}*\nHadir (${rec.hadir.length}):\n${list}`);
+    }
+},
+{
+    re: /^\.absen(?:\s+(.+))?$/i,
+    admin: true,
+    run: async (ctx, m) => {
+        if (!ctx.isGroup) return replyErr(ctx, "Absen cuma jalan di grup.");
+        const title = m[1]?.trim() || 'Absensi';
+        openAbsen(ctx.from, title, ctx.senderName);
+        await reply(ctx, `📋 Absen dibuka: *${title}*\n\nAnggota ketik *.hadir*. Owner: *.absen tutup*.`);
+    }
+},
+{
+    re: /^\.hadir$/i,
+    run: async (ctx) => {
+        if (!ctx.isGroup) return replyErr(ctx, "Absen cuma jalan di grup.");
+        const res = markPresent(ctx.from, ctx.sender, ctx.senderName);
+        if (!res.ok) return replyErr(ctx, "Ga ada sesi absen aktif.");
+        if (res.already) return reply(ctx, "Kamu udah terdaftar hadir.");
+        await reply(ctx, `✅ ${ctx.senderName} hadir. Total: ${res.count}`);
     }
 },
 {
