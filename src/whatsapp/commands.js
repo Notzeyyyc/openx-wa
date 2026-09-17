@@ -7,6 +7,7 @@ import {
     fetchArticleText, stripMarkdown
 } from './helpers.js';
 import { chatCompletion } from '../provider.js';
+import { downloadMedia } from '../downloader.js';
 import { buildPollPayload } from './poll.js';
 import {
     parseQuizResponse, parseAnswer, startQuiz, getSession as getQuizSession,
@@ -39,6 +40,8 @@ import { listModels, groupByFamily } from '../models.js';
 import { getOwner, isOwner, claimOwner } from '../owner.js';
 
 const SENSITIVE_TTL_MS = 2 * 60 * 1000;
+const MAX_CONCURRENT_DOWNLOADS = 2;
+let activeDownloads = 0;
 
 // --- tiny helpers shared by all handlers ---
 const reply = (ctx, text) => ctx.waSock.sendMessage(ctx.from, { text }, { quoted: ctx.msg });
@@ -143,6 +146,32 @@ const COMMANDS = [
             { role: 'user', content: text }
         ]);
         await reply(ctx, stripMarkdown(summary) || "Gagal meringkas artikel.");
+    }
+},
+{
+    re: /^\.dl(?:\s+(audio|video))?\s+(https?:\/\/\S+)$/i,
+    run: async (ctx, m) => {
+        const mode = (m[1] || 'video').toLowerCase();
+        const url = m[2];
+        if (activeDownloads >= MAX_CONCURRENT_DOWNLOADS) {
+            return replyErr(ctx, "Server lagi sibuk ngunduh, coba lagi bentar.");
+        }
+        activeDownloads++;
+        try {
+            await reply(ctx, mode === 'audio' ? "🎧 Mengunduh audio..." : "🎬 Mengunduh video...");
+            const { buffer, filename, type } = await downloadMedia(url, { mode });
+            if (type === 'video') {
+                await ctx.waSock.sendMessage(ctx.from, { video: buffer, fileName: filename, mimetype: 'video/mp4' }, { quoted: ctx.msg });
+            } else if (type === 'audio') {
+                await ctx.waSock.sendMessage(ctx.from, { audio: buffer, mimetype: 'audio/mp4' }, { quoted: ctx.msg });
+            } else {
+                await ctx.waSock.sendMessage(ctx.from, { document: buffer, fileName: filename, mimetype: 'application/octet-stream' }, { quoted: ctx.msg });
+            }
+        } catch (e) {
+            await replyErr(ctx, e.message);
+        } finally {
+            activeDownloads--;
+        }
     }
 },
 {

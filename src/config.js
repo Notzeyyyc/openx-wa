@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { ENV_FILE } from './paths.js';
+import { ENV_FILE, ROOT } from './paths.js';
 
 function loadDotEnvIfPresent() {
     try {
@@ -22,6 +22,13 @@ export const config = {
     fgsi: {
         baseUrl: process.env.OPENX_FGSI_BASE_URL || "https://fgsi.dpdns.org/api/ai/claude",
         apiKey: process.env.OPENX_FGSI_API_KEY || "",
+    },
+    // yt-dlp standalone binary (no Python). Auto-downloaded on boot if missing.
+    ytdlp: {
+        path: process.env.OPENX_YTDLP_PATH || path.join(ROOT, 'bin', process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'),
+        channel: process.env.OPENX_YTDLP_CHANNEL || 'nightly',
+        jsRuntime: process.env.OPENX_YTDLP_JS_RUNTIME || 'node',
+        maxMb: parseInt(process.env.OPENX_YTDLP_MAX_MB || '64', 10),
     },
 };
 

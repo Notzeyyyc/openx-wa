@@ -6,8 +6,9 @@
   "scripts": {
     "start": "node index.js",
     "setup": "node setup/index.js",
+    "ytdlp:install": "node scripts/fetch-ytdlp.mjs",
     "scan:secrets": "node scripts/scan-secrets.mjs",
-    "test": "pnpm run scan:secrets && node --test --test-force-exit src/whatsapp/commands.test.mjs src/whatsapp/features.test.mjs src/provider.test.mjs src/models.test.mjs"
+    "test": "pnpm run scan:secrets && node --test --test-force-exit src/whatsapp/commands.test.mjs src/whatsapp/features.test.mjs src/provider.test.mjs src/models.test.mjs src/ytdlp.test.mjs"
   },
   "keywords": [],
   "author": "",

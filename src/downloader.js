@@ -1,62 +1,36 @@
-import fs from "fs";
-import path from "path";
-
-const COBALT_API_URL = "https://api.cobalt.tools/api/json";
+import { config } from './config.js';
+import { resolveMediaUrl, downloadToTemp } from './ytdlp.js';
 
 /**
- * Downloads media from various social media platforms using Cobalt API.
+ * Download media via the local yt-dlp binary.
+ * Fast path resolves a direct URL with `yt-dlp -g` (no temp files / no ffmpeg);
+ * if no single-file format exists (common on YouTube), falls back to a
+ * download + ffmpeg merge into a temp file.
+ * Returns { buffer, filename, type }.
  */
-export async function downloadMedia(url) {
+export async function downloadMedia(url, { mode = 'video' } = {}) {
+    let buffer;
+    let ext;
+
     try {
-        const response = await fetch(COBALT_API_URL, {
-            method: "POST",
-            headers: {
-                "Accept": "application/json",
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                url: url,
-                vCodec: "h264",
-                vQuality: "720",
-                aFormat: "mp3",
-                isNoWatermark: true
-            })
-        });
-
-        if (!response.ok) {
-            const err = await response.json();
-            throw new Error(`Cobalt API error: ${err.message || response.statusText}`);
-        }
-
-        const data = await response.json();
-        
-        if (data.status === "stream" || data.status === "picker") {
-            // For now, only return the first stream URL
-            const mediaUrl = data.status === "stream" ? data.url : (data.picker ? data.picker[0].url : null);
-            if (!mediaUrl) throw new Error("No media URL found in picker response.");
-            
-            // Fetch the actual media buffer
-            const mediaResponse = await fetch(mediaUrl);
-            if (!mediaResponse.ok) throw new Error(`Failed to fetch media from ${mediaUrl}`);
-            
-            const buffer = Buffer.from(await mediaResponse.arrayBuffer());
-            
-            // Try to guess extension from URL or content-type
-            let ext = "bin";
-            const contentType = mediaResponse.headers.get("content-type");
-            if (contentType) {
-                if (contentType.includes("video")) ext = "mp4";
-                else if (contentType.includes("audio")) ext = "mp3";
-                else if (contentType.includes("image")) ext = "jpg";
-            }
-            
-            const filename = `openx_dl_${Date.now()}.${ext}`;
-            return { buffer, filename, type: ext === "mp3" ? "audio" : (ext === "mp4" ? "video" : "document") };
-        }
-        
-        throw new Error(`Unexpected status from Cobalt: ${data.status}`);
-    } catch (error) {
-        console.error(`[Downloader] Error: ${error.message}`);
-        throw error;
+        const mediaUrl = await resolveMediaUrl(url, { mode });
+        const response = await fetch(mediaUrl, { signal: AbortSignal.timeout(30000) });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        buffer = Buffer.from(await response.arrayBuffer());
+        const contentType = response.headers.get('content-type') || '';
+        ext = mode === 'audio' ? 'm4a' : (contentType.includes('video') || contentType.includes('mp4') ? 'mp4' : 'bin');
+    } catch {
+        const tmp = await downloadToTemp(url, { mode });
+        buffer = tmp.buffer;
+        ext = tmp.ext;
     }
+
+    const maxBytes = config.ytdlp.maxMb * 1024 * 1024;
+    if (buffer.length > maxBytes) {
+        const size = (buffer.length / 1048576).toFixed(1);
+        throw new Error(`File kegedean (${size}MB > ${config.ytdlp.maxMb}MB).`);
+    }
+
+    const type = mode === 'audio' ? 'audio' : (ext === 'mp4' ? 'video' : 'document');
+    return { buffer, filename: `openx_dl_${Date.now()}.${ext}`, type };
 }
