@@ -5,12 +5,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const dataFiles = ['quiz-scores.json', 'absen.json'].map(f => path.join(ROOT, 'data', f));
+const dataFiles = ['quiz-scores.json', 'absen.json', 'prds.json'].map(f => path.join(ROOT, 'data', f));
 const backups = dataFiles.map(f => ({ f, content: fs.existsSync(f) ? fs.readFileSync(f, 'utf-8') : null }));
 
 const { buildPollPayload } = await import('./poll.js');
 const quiz = await import('./quiz.js');
 const absen = await import('./absen.js');
+const prd = await import('./prd.js');
 const { extractReadableText } = await import('./helpers.js');
 
 test.after(() => {
@@ -92,4 +93,61 @@ test('extractReadableText: strips tags/scripts/entities', () => {
     assert.match(text, /Halo & dunia/);
     assert.doesNotMatch(text, /bad\(\)/);
     assert.doesNotMatch(text, /<p>/);
+});
+
+test('parseMenuSelection: numbers, letters, invalid dropped', () => {
+    assert.deepEqual(prd.parseMenuSelection('1,3 5', 5), [0, 2, 4]);
+    assert.deepEqual(prd.parseMenuSelection('A C', 4), [0, 2]);
+    assert.deepEqual(prd.parseMenuSelection('9 x', 4), []);
+    assert.deepEqual(prd.parseMenuSelection('', 4), []);
+});
+
+test('parseFeatureList: fenced JSON, caps at 6', () => {
+    assert.deepEqual(prd.parseFeatureList('```json\n["a","b"]\n```'), ['a', 'b']);
+    assert.equal(prd.parseFeatureList('nope').length, 0);
+    assert.equal(prd.parseFeatureList(JSON.stringify(Array.from({ length: 9 }, (_, i) => 'f' + i))).length, 6);
+});
+
+test('prd wizard: full flow picks menu options and features', () => {
+    const chat = 'prd-chat';
+    let prompt = prd.startPrd(chat, 'Aplikasi Catatan');
+    assert.equal(prompt.kind, 'menu');
+    assert.equal(prompt.key, 'platform');
+
+    prompt = prd.submitPrdAnswer(chat, '2').prompt;
+    assert.equal(prompt.key, 'target');
+
+    prompt = prd.submitPrdAnswer(chat, 'mahasiswa').prompt;
+    assert.equal(prompt.key, 'problem');
+
+    prompt = prd.submitPrdAnswer(chat, 'susah nyatet cepat').prompt;
+    assert.equal(prompt.kind, 'features');
+
+    prd.setFeatureOptions(chat, ['Catat cepat', 'Tag', 'Search']);
+    prompt = prd.submitPrdAnswer(chat, '1,3').prompt;
+    assert.equal(prompt.key, 'metric');
+
+    const done = prd.submitPrdAnswer(chat, '1').prompt;
+    assert.equal(done.kind, 'done');
+
+    const s = prd.getSession(chat);
+    assert.equal(s.answers.platform, 'Mobile');
+    assert.equal(s.answers.features, 'Catat cepat, Search');
+    assert.equal(s.answers.metric, 'Retention');
+    assert.match(prd.buildPrdPrompt(s), /Aplikasi Catatan/);
+    prd.clearSession(chat);
+});
+
+test('prd: skip advances, storage roundtrip', () => {
+    const chat = 'prd-skip';
+    prd.startPrd(chat, null);
+    assert.equal(prd.nextPrompt(prd.getSession(chat)).kind, 'idea');
+
+    assert.equal(prd.skipStep(chat).prompt.key, 'platform');
+    assert.equal(prd.skipStep(chat).prompt.key, 'target');
+
+    const saved = prd.savePrd(chat, { title: 'T', content: '# PRD' });
+    assert.equal(prd.getPrd(chat, saved.id).content, '# PRD');
+    assert.equal(prd.listPrds(chat).length, 1);
+    prd.clearSession(chat);
 });

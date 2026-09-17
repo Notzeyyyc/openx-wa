@@ -16,6 +16,11 @@ import {
     openSession as openAbsen, getSession as getAbsenSession,
     markPresent, closeSession as closeAbsen, formatHadir
 } from './absen.js';
+import {
+    PRD_HELP, startPrd, submitPrdAnswer, skipStep as skipPrd, clearSession as clearPrd,
+    getSession as getPrdSession, setFeatureOptions, formatPrompt, buildPrdPrompt,
+    parseFeatureList, savePrd, listPrds, getPrd
+} from './prd.js';
 import { webSearch } from './web-search.js';
 import { generateImage } from './image-gen.js';
 import { pendingSensitiveActions, executeSensitiveAction } from './sensitive-actions.js';
@@ -45,6 +50,49 @@ async function sendQuizQuestion(ctx) {
     if (!q || !s) return;
     const opts = q.options.map((o, i) => `${String.fromCharCode(65 + i)}. ${o}`).join('\n');
     await reply(ctx, `Soal ${s.idx + 1}/${s.questions.length}\n\n${q.q}\n\n${opts}\n\nJawab: .jawab <A/B/C/D>`);
+}
+
+async function sendPrdPrompt(ctx, prompt) {
+    if (prompt?.kind === 'features') {
+        const s = getPrdSession(ctx.from);
+        if (s && !s.featureOptions?.length) {
+            try {
+                const aiText = await chatCompletion(getActiveProfile(), [
+                    { role: 'system', content: 'Balas HANYA JSON array of strings, tanpa teks lain.' },
+                    { role: 'user', content: `Rekomendasikan 5 fitur MVP singkat (maks 8 kata) untuk produk: ${s.idea}. Target: ${s.answers.target || '-'}. Masalah: ${s.answers.problem || '-'}. Format: ["fitur 1","fitur 2"]` }
+                ], true);
+                const opts = parseFeatureList(aiText);
+                if (opts.length) setFeatureOptions(ctx.from, opts);
+            } catch {}
+        }
+        const s2 = getPrdSession(ctx.from);
+        if (s2?.featureOptions?.length) {
+            return reply(ctx, formatPrompt({ ...prompt, featureOptions: s2.featureOptions }));
+        }
+        return reply(ctx, `${prompt.question}\n\n(AI ga bisa kasih rekomendasi. Tulis fitur MVP, pisah pakai koma.)`);
+    }
+    return reply(ctx, formatPrompt(prompt));
+}
+
+async function composePrd(ctx) {
+    const s = getPrdSession(ctx.from);
+    if (!s) return replyErr(ctx, "Sesi PRD ilang, mulai ulang `.prd new`.");
+    await reply(ctx, "📝 Nyusun PRD...");
+
+    let content = "";
+    try {
+        content = await chatCompletion(getActiveProfile(), [
+            { role: 'system', content: 'Kamu product manager berpengalaman. Tulis PRD markdown rapi.' },
+            { role: 'user', content: buildPrdPrompt(s) }
+        ], true);
+    } catch (e) {
+        return replyErr(ctx, `Gagal nyusun PRD: ${e.message}`);
+    }
+    if (!content) return replyErr(ctx, "AI balas kosong, coba lagi.");
+
+    const saved = savePrd(ctx.from, { title: (s.idea || 'PRD').slice(0, 60), content });
+    clearPrd(ctx.from);
+    await reply(ctx, `✅ PRD tersimpan (ID ${saved.id})\n\n${content}\n\n— Export file: .prd export ${saved.id}`);
 }
 
 // --- command handlers (ordered; first regex match wins) ---
@@ -181,6 +229,52 @@ const COMMANDS = [
         if (!res.ok) return replyErr(ctx, "Ga ada sesi absen aktif.");
         if (res.already) return reply(ctx, "Kamu udah terdaftar hadir.");
         await reply(ctx, `✅ ${ctx.senderName} hadir. Total: ${res.count}`);
+    }
+},
+{
+    re: /^\.prd(?:\s+([\s\S]+))?$/i,
+    run: async (ctx, m) => {
+        const input = (m[1] || '').trim();
+        const sub = input.split(/\s+/)[0]?.toLowerCase();
+        if (!input) return reply(ctx, PRD_HELP);
+
+        if (sub === 'batal') { clearPrd(ctx.from); return reply(ctx, "🛑 Sesi PRD dibatalkan."); }
+
+        if (sub === 'skip') {
+            const res = skipPrd(ctx.from);
+            if (!res.ok) return replyErr(ctx, "Ga ada sesi PRD. Mulai dengan `.prd new`.");
+            return res.prompt.kind === 'done' ? composePrd(ctx) : sendPrdPrompt(ctx, res.prompt);
+        }
+
+        if (sub === 'list') {
+            const list = listPrds(ctx.from);
+            if (!list.length) return reply(ctx, "📄 Belum ada PRD.");
+            return reply(ctx, `📄 *PRD tersimpan:*\n${list.map(p => `[${p.id}] ${p.title}`).join('\n')}`);
+        }
+
+        if (sub === 'show' || sub === 'export') {
+            const id = input.split(/\s+/)[1];
+            const prd = getPrd(ctx.from, id);
+            if (!prd) return replyErr(ctx, `PRD ${id || ''} ga ketemu.`);
+            if (sub === 'show') return reply(ctx, `📄 *${prd.title}* (${prd.id})\n\n${prd.content}`);
+            await ctx.waSock.sendMessage(ctx.from, {
+                document: Buffer.from(prd.content, 'utf-8'),
+                fileName: `${prd.title}.md`,
+                mimetype: 'text/markdown'
+            }, { quoted: ctx.msg });
+            return;
+        }
+
+        if (sub === 'new') {
+            const idea = input.replace(/^new\b\s*/i, '').trim();
+            return sendPrdPrompt(ctx, startPrd(ctx.from, idea));
+        }
+
+        const session = getPrdSession(ctx.from);
+        if (!session) return reply(ctx, PRD_HELP);
+        const res = submitPrdAnswer(ctx.from, input);
+        if (!res.ok) return replyErr(ctx, "Sesi PRD bermasalah, mulai ulang `.prd new`.");
+        return res.prompt.kind === 'done' ? composePrd(ctx) : sendPrdPrompt(ctx, res.prompt);
     }
 },
 {
