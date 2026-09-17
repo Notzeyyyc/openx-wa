@@ -136,11 +136,8 @@ Sebelum aksi sensitif, kasih [PRE_NOTIFY|pesan] dulu. Use 'none' jika Target WA 
     // Save user message to history
     if (from) saveMessage(from, 'user', userMessage);
 
-    const startTime = Date.now();
     const model = getMainModel() || getCurrentModel();
     let aiResult = await chatCompletion({ ...getActiveProfile(), model }, messages, isComplex) || "";
-    const responseTimeMs = Date.now() - startTime;
-    if (from) trackAIResponse(from, responseTimeMs, model);
     
     // Optional pre-notify message to user before actions
     const preNotifyRegex = /\[PRE_NOTIFY\|(.*?)\]/g;
